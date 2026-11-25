@@ -138,8 +138,14 @@ class AccountDropdown extends StatelessWidget {
         for (final a in accounts)
           DropdownMenuItem(
             value: a.id,
-            child: Text('${a.name} · ${a.kind == AccountKind.physical ? 'físico' : 'digital'} (${formatMoney(l.balance(a.id))})',
-                overflow: TextOverflow.ellipsis),
+            // El icono indica si es dinero físico o digital; así el texto cabe.
+            child: Row(children: [
+              Icon(a.kind == AccountKind.physical ? Icons.payments_outlined : Icons.account_balance_outlined, size: 18),
+              const SizedBox(width: 8),
+              Expanded(child: Text(a.name, overflow: TextOverflow.ellipsis)),
+              const SizedBox(width: 8),
+              Text(formatMoney(l.balance(a.id)), style: Theme.of(context).textTheme.bodySmall),
+            ]),
           ),
       ],
       onChanged: onChanged,
@@ -199,24 +205,62 @@ class PageBody extends StatelessWidget {
 }
 
 /// Diálogo con formulario estándar.
-Future<T?> showFormDialog<T>(BuildContext context, {required String title, required Widget Function(BuildContext, StateSetter) builder, required T? Function() onSubmit, required GlobalKey<FormState> formKey, String action = 'Guardar'}) {
+/// Formulario estándar. En pantallas angostas (teléfono) se abre a pantalla
+/// completa con desplazamiento y el botón de guardar siempre visible, para que
+/// el teclado no tape campos; en pantallas anchas, como diálogo.
+///
+/// [title] puede ser un texto o una función (para títulos que cambian según
+/// lo que se elige dentro del formulario).
+Future<T?> showFormDialog<T>(BuildContext context,
+    {required Object title,
+    required Widget Function(BuildContext, StateSetter) builder,
+    required T? Function() onSubmit,
+    required GlobalKey<FormState> formKey,
+    String action = 'Guardar'}) {
+  String titleText() => title is String Function() ? title() : '$title';
+  void submit(BuildContext c) {
+    if (formKey.currentState!.validate()) Navigator.pop(c, onSubmit());
+  }
+
+  if (MediaQuery.sizeOf(context).width < 600) {
+    return Navigator.of(context).push<T>(MaterialPageRoute(
+      fullscreenDialog: true,
+      builder: (c) => StatefulBuilder(
+        builder: (c, setState) => Scaffold(
+          appBar: AppBar(
+            title: Text(titleText()),
+            leading: IconButton(icon: const Icon(Icons.close), tooltip: 'Cancelar', onPressed: () => Navigator.pop(c)),
+          ),
+          body: Form(
+            key: formKey,
+            child: ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 24), children: [builder(c, setState)]),
+          ),
+          bottomNavigationBar: SafeArea(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(16, 8, 16, 8 + MediaQuery.viewInsetsOf(c).bottom),
+              child: FilledButton(
+                style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+                onPressed: () => submit(c),
+                child: Text(action),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ));
+  }
   return showDialog<T>(
     context: context,
     builder: (c) => StatefulBuilder(
       builder: (c, setState) => AlertDialog(
-        title: Text(title),
+        title: Text(titleText()),
         content: SizedBox(
           width: 420,
           child: Form(key: formKey, child: SingleChildScrollView(child: builder(c, setState))),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(c), child: const Text('Cancelar')),
-          FilledButton(
-            onPressed: () {
-              if (formKey.currentState!.validate()) Navigator.pop(c, onSubmit());
-            },
-            child: Text(action),
-          ),
+          FilledButton(onPressed: () => submit(c), child: Text(action)),
         ],
       ),
     ),

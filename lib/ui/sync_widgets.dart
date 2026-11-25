@@ -217,3 +217,34 @@ class AccountSection extends StatelessWidget {
     if (context.mounted) showMessage(context, 'Sesión cerrada');
   }
 }
+
+/// Engrane de Ajustes; en el teléfono lleva un punto si la sincronización
+/// necesita atención (conflicto, sin conexión o cambios pendientes).
+class SettingsButton extends StatelessWidget {
+  final bool showSyncDot;
+  final VoidCallback onTap;
+  const SettingsButton({super.key, required this.showSyncDot, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = SyncScope.of(context).sync;
+    final scheme = Theme.of(context).colorScheme;
+    final status = s?.status;
+    final Color? dot = !showSyncDot || status == null
+        ? null
+        : switch (status) {
+            SyncStatus.conflict || SyncStatus.offline => scheme.error,
+            _ => null,
+          };
+    return IconButton(
+      tooltip: s == null || !showSyncDot ? 'Ajustes' : 'Ajustes · ${syncLook(s).$2}',
+      onPressed: onTap,
+      icon: Badge(
+        isLabelVisible: dot != null,
+        smallSize: 9,
+        backgroundColor: dot,
+        child: const Icon(Icons.settings_outlined),
+      ),
+    );
+  }
+}

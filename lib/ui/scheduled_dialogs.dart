@@ -34,7 +34,8 @@ Future<void> showScheduledForm(BuildContext context, {bool isIncome = true, Recu
 
   final ok = await showFormDialog<bool>(
     context,
-    title: editing != null
+    // El título cambia si se elige Ingreso o Gasto dentro del formulario.
+    title: () => editing != null
         ? 'Editar ${income ? 'ingreso' : 'gasto'} recurrente'
         : (income ? 'Ingreso previsto' : 'Gasto o pago programado'),
     formKey: formKey,
@@ -276,6 +277,7 @@ Future<void> showEventActions(BuildContext context, CalendarEvent e) async {
   final picked = await showModalBottomSheet<int>(
     context: context,
     showDragHandle: true,
+    isScrollControlled: true,
     builder: (c) => SafeArea(
       child: Column(mainAxisSize: MainAxisSize.min, children: [
         ListTile(

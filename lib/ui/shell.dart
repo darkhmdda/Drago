@@ -20,7 +20,7 @@ class AppShell extends StatefulWidget {
 class _AppShellState extends State<AppShell> {
   int _index = 0;
 
-  static const _titles = ['Inicio', 'Deudas y pagos', 'Calendario financiero', 'Movimientos', 'Reportes'];
+  static const _titles = ['Inicio', 'Deudas y pagos', 'Calendario', 'Movimientos', 'Reportes'];
   static const _destinations = [
     (Icons.home_outlined, Icons.home, 'Inicio'),
     (Icons.credit_card_outlined, Icons.credit_card, 'Deudas'),
@@ -61,8 +61,10 @@ class _AppShellState extends State<AppShell> {
             onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AssistantScreen())),
           ),
           const NotificationBell(),
-          SyncIndicator(onTap: () => openSettings(context)),
-          IconButton(tooltip: 'Ajustes', icon: const Icon(Icons.settings_outlined), onPressed: () => openSettings(context)),
+          // En pantallas anchas se muestra el estado de la nube; en el teléfono
+          // va como un punto sobre el engrane (solo si hay algo que atender).
+          if (wide) SyncIndicator(onTap: () => openSettings(context)),
+          SettingsButton(showSyncDot: !wide, onTap: () => openSettings(context)),
           const SizedBox(width: 4),
         ],
       ),

@@ -201,6 +201,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
     return showModalBottomSheet<Period>(
       context: context,
       showDragHandle: true,
+      isScrollControlled: true,
       builder: (c) => SafeArea(
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           const Padding(padding: EdgeInsets.only(bottom: 8), child: Text('¿Qué periodo exportar?', style: TextStyle(fontWeight: FontWeight.w600))),

@@ -227,6 +227,7 @@ Future<void> showQuickActions(BuildContext context) async {
   final choice = await showModalBottomSheet<int>(
     context: context,
     showDragHandle: true,
+    isScrollControlled: true,
     builder: (c) => SafeArea(
       child: SingleChildScrollView(
         child: Column(mainAxisSize: MainAxisSize.min, children: [
