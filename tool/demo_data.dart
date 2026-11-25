@@ -32,5 +32,15 @@ void main() {
     (amount: 7200, dueDate: DateTime(t.year, t.month, t.day + 11)),
     (amount: 7200, dueDate: DateTime(t.year, t.month, t.day + 41)),
   ]);
+  if (const bool.fromEnvironment('enrich') || Platform.environment['ENRICH'] == '1') {
+    final didi = l.debts.first;
+    final first = l.installmentsOf(didi.id).first;
+    l.payInstallment(installmentId: first.id, accountId: cash, amount: 30000);
+    final rec = l.recurrences.first;
+    final occ = rec.occurrences(t, t.add(const Duration(days: 14)));
+    l.confirmScheduledItem(l.ensureScheduledItem(recurrenceId: rec.id, occurrenceDate: occ[0]));
+    l.markScheduledSkipped(l.ensureScheduledItem(recurrenceId: rec.id, occurrenceDate: occ[1]));
+    l.transfer(fromAccountId: cash, toAccountId: bank, amount: 5000, date: t);
+  }
   stdout.writeln(jsonEncode(l.toJson()));
 }

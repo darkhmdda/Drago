@@ -6,6 +6,7 @@ import '../domain/ledger.dart';
 import '../domain/models.dart';
 import '../domain/money.dart';
 import 'common.dart';
+import 'sync_widgets.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -14,7 +15,9 @@ class SettingsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final l = AppScope.of(context).ledger;
     return PageBody(children: [
-      SectionTitle('Cuentas',
+      const SectionTitle('Cuenta y sincronización'),
+      const AccountSection(),
+      SectionTitle('Cuentas de dinero',
           trailing: TextButton.icon(onPressed: () => _addAccount(context), icon: const Icon(Icons.add), label: const Text('Nueva'))),
       for (final a in l.accounts)
         Card(
@@ -69,7 +72,7 @@ class SettingsScreen extends StatelessWidget {
         ]),
       ),
       const SizedBox(height: 16),
-      const Center(child: Text('Drago · v0.3 · datos guardados en este dispositivo', style: TextStyle(fontSize: 12))),
+      const Center(child: Text('Drago · v0.3.1 · los datos se guardan primero en este dispositivo', style: TextStyle(fontSize: 12))),
     ]);
   }
 

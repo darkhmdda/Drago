@@ -111,7 +111,7 @@ class MonthSummary {
 ///
 /// Regla de atomicidad: cada operación valida TODO antes de modificar algo.
 class Ledger {
-  static const schemaVersion = 1;
+  static const schemaVersion = 2;
   static const _uuid = Uuid();
 
   final List<Account> accounts;

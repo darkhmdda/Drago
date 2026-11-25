@@ -13,6 +13,10 @@ class AppState extends ChangeNotifier {
 
   AppState(this.storage, this._ledger);
 
+  /// Se llama después de cada cambio hecho por el usuario en este dispositivo
+  /// (lo usa la sincronización para saber que hay algo que subir).
+  void Function()? onLocalChange;
+
   Ledger get ledger => _ledger;
 
   static Future<AppState> open(LedgerStorage storage) async {
@@ -30,6 +34,7 @@ class AppState extends ChangeNotifier {
     await storage.save(draft);
     _ledger = draft;
     notifyListeners();
+    onLocalChange?.call();
     return result;
   }
 
@@ -45,6 +50,15 @@ class AppState extends ChangeNotifier {
     final restored = Ledger.fromJson(data);
     await storage.save(restored);
     _ledger = restored;
+    notifyListeners();
+    onLocalChange?.call();
+  }
+
+  /// Reemplaza los datos locales con los descargados de la nube.
+  /// No cuenta como cambio local (no dispara una nueva subida).
+  Future<void> replaceFromSync(Ledger remote) async {
+    await storage.save(remote);
+    _ledger = remote;
     notifyListeners();
   }
 }

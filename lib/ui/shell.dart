@@ -6,6 +6,7 @@ import 'dialogs.dart';
 import 'home_screen.dart';
 import 'movements_screen.dart';
 import 'settings_screen.dart';
+import 'sync_widgets.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
@@ -43,9 +44,15 @@ class _AppShellState extends State<AppShell> {
           onPressed: () => showQuickActions(context), icon: const Icon(Icons.add), label: const Text('Registrar')),
     };
 
-    final body = IndexedStack(index: _index, children: pages);
+    final body = Column(children: [
+      const ConflictBanner(),
+      Expanded(child: IndexedStack(index: _index, children: pages)),
+    ]);
     return Scaffold(
-      appBar: AppBar(title: Text(_titles[_index])),
+      appBar: AppBar(
+        title: Text(_titles[_index]),
+        actions: [SyncIndicator(onTap: () => setState(() => _index = 4)), const SizedBox(width: 8)],
+      ),
       floatingActionButton: fab,
       bottomNavigationBar: wide
           ? null

@@ -98,7 +98,7 @@ create table transactions (
   description        text not null default '',
   account_id         uuid not null references accounts,
   to_account_id      uuid references accounts,
-  category_id        uuid references categories on delete set null,
+  category           text,
   debt_id            uuid references debts on delete restrict,
   installment_id     uuid references installments on delete restrict,
   scheduled_item_id  uuid references scheduled_items on delete set null,

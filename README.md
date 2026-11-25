@@ -16,7 +16,8 @@ La especificación completa está en [`docs/especificacion.md`](docs/especificac
 | 0.3 | Calendario mensual, semanal y agenda; ingresos y gastos recurrentes; pagos integrados | ✅ |
 | 0.4 | Notificaciones, exportación Excel/CSV | ⏳ |
 | 0.5 | Proyecciones y escenarios | 🟡 Saldo proyectado y alerta de saldo negativo |
-| 1.0 | Asistente, capturas, sincronización con Supabase | ⏳ (esquema SQL y configuración listos) |
+| — | Cuenta y sincronización con Supabase (adelantado de la 1.0) | ✅ Ver [docs/supabase.md](docs/supabase.md) |
+| 1.0 | Asistente, capturas | ⏳ |
 
 ### Lo que ya funciona
 - **Inicio**: dinero físico, dinero digital y total disponible (solo dinero real), próximo pago, próximo ingreso,
@@ -33,6 +34,8 @@ La especificación completa está en [`docs/especificacion.md`](docs/especificac
   - Cada fecha se **confirma por separado** (con el importe real), se marca como **no recibida** o se **ajusta**
     sin tocar la regla. Las cuotas de las deudas aparecen solas y vinculadas a su cuota original: nunca se duplican.
   - La agenda muestra el **saldo proyectado** después de cada evento; los ingresos atrasados no se suman hasta confirmarse.
+- **Cuenta y sincronización** (opcional): inicio de sesión con correo; los datos se guardan primero en el dispositivo
+  y se sincronizan con Supabase; si dos dispositivos cambian a la vez, la app pregunta qué copia conservar.
 - **Ajustes**: gestión de cuentas, respaldo/restauración (JSON) e historial de cambios (auditoría).
 - Dinero siempre en **centavos enteros**; operaciones **atómicas**.
 
@@ -52,8 +55,8 @@ test/          Pruebas (incluye las de la sección 15 de la especificación)
 tool/          Generador de datos de ejemplo
 ```
 
-Los datos se guardan hoy **en el dispositivo** (almacenamiento local del navegador o de Android). El esquema de
-Supabase (`supabase/migrations`) ya refleja el mismo modelo para la sincronización futura.
+Los datos se guardan primero **en el dispositivo** (almacenamiento local del navegador o de Android) y, si inicias
+sesión, se sincronizan con Supabase. Configuración: [docs/supabase.md](docs/supabase.md).
 
 ## Cómo ejecutarlo
 
