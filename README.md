@@ -7,7 +7,7 @@ La especificación completa está en [`docs/especificacion.md`](docs/especificac
 
 > Regla principal: **nunca confundir el dinero que realmente tienes con el dinero que esperas recibir.**
 
-## Estado actual: v0.5 (proyecciones) + asistente
+## Estado actual: v1.0
 
 | Versión | Contenido | Estado |
 |---|---|---|
@@ -17,7 +17,7 @@ La especificación completa está en [`docs/especificacion.md`](docs/especificac
 | 0.4 | Recordatorios de pagos, centro de notificaciones, reportes mensuales, exportación Excel/CSV/PDF | ✅ |
 | 0.5 | Proyecciones, gráfica, simulaciones guardables y comparación | ✅ |
 | — | Cuenta y sincronización con Supabase (adelantado de la 1.0) | ✅ Ver [docs/supabase.md](docs/supabase.md) |
-| 1.0 | Asistente en lenguaje natural (por reglas, sin IA) ✅ · Importar capturas ⏳ | 🟡 |
+| 1.0 | Asistente en lenguaje natural (por reglas, sin IA), importar capturas con lectura de texto en el dispositivo, sincronización, respaldo en archivo | ✅ |
 
 ### Lo que ya funciona
 - **Inicio**: dinero físico, dinero digital y total disponible (solo dinero real), próximo pago, próximo ingreso,
@@ -40,6 +40,10 @@ La especificación completa está en [`docs/especificacion.md`](docs/especificac
 - **Asistente** (icono de chat): «Hoy gasté 80 en comida», «Recibí 400», «Pagué DiDi», «Cambió la cuota de Coppel a 450»,
   «¿Cuánto debo en diciembre?», «¿Cuánto tenía el 20 de noviembre?», «Simula diciembre con 400 semanales». Funciona sin
   IA ni conexión; pregunta cuando hay varias opciones y siempre pide confirmación antes de modificar datos.
+- **Importar capturas** (Deudas → Importar captura): lee el texto de una captura o foto de DiDi, Coppel, Mercado Pago…
+  (ML Kit en Android, Tesseract en el navegador; la imagen no sale del dispositivo), detecta fechas, importes y saldo
+  pendiente, y muestra una tabla «Antes / Detectado». Solo se aplican los cambios que eliges y confirmas; nunca se borran
+  cuotas ni se tocan las ya pagadas.
 - **Cuenta y sincronización** (opcional): inicio de sesión con correo; los datos se guardan primero en el dispositivo
   y se sincronizan con Supabase; si dos dispositivos cambian a la vez, la app pregunta qué copia conservar.
 - **Temas**: Clásico, Clásico oscuro, Ryusui y Nami (Ajustes → Apariencia), con colores de ingresos, gastos y pendientes adaptados a cada uno.
@@ -47,7 +51,7 @@ La especificación completa está en [`docs/especificacion.md`](docs/especificac
   con hora elegida) que se cancelan al pagar y se mueven si cambia la fecha; centro de notificaciones (campana) en web y Android.
 - **Reportes**: resumen mensual con comparación contra el mes anterior, gastos por categoría y pagos por deuda;
   exportación a Excel (Resumen, Movimientos, Deudas, Cuotas, Calendario, Proyección) y CSV, por periodo.
-- **Ajustes** (engrane arriba a la derecha): gestión de cuentas, respaldo/restauración (JSON) e historial de cambios (auditoría).
+- **Ajustes** (engrane arriba a la derecha): gestión de cuentas, respaldo/restauración en archivo (JSON) e historial de cambios (auditoría).
 - Dinero siempre en **centavos enteros**; operaciones **atómicas**.
 
 ## Estructura
@@ -83,6 +87,12 @@ flutter test
 
 ```bash
 flutter run -d chrome
+```
+
+La lectura de capturas en la web necesita Tesseract en `web/tesseract/` (no se guarda en el repositorio):
+
+```bash
+bash tool/fetch_ocr_web.sh
 ```
 
 Compilar la versión web (sin depender de CDN, funciona sin conexión a gstatic):

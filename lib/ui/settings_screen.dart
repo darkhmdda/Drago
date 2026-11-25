@@ -1,4 +1,7 @@
 import 'package:material_ui/material_ui.dart';
+import 'dart:convert';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/services.dart';
 
 import '../data/app_state.dart';
@@ -6,6 +9,7 @@ import '../domain/ledger.dart';
 import '../domain/models.dart';
 import '../domain/money.dart';
 import 'common.dart';
+import '../data/exporter.dart';
 import 'sync_widgets.dart';
 import 'themes.dart';
 import 'notifications_screen.dart';
@@ -53,6 +57,24 @@ class SettingsScreen extends StatelessWidget {
       Card(
         child: Column(children: [
           ListTile(
+            leading: const Icon(Icons.save_alt),
+            title: const Text('Descargar respaldo'),
+            subtitle: const Text('Archivo con toda tu información (.json). Guárdalo en un lugar seguro.'),
+            onTap: () async {
+              final json = AppScope.of(context).exportBackup();
+              final stamp = DateTime.now().toIso8601String().substring(0, 10);
+              await saveFile(Uint8List.fromList(utf8.encode(json)), 'drago_respaldo_$stamp.json', 'application/json');
+            },
+          ),
+          const Divider(height: 1),
+          ListTile(
+            leading: const Icon(Icons.file_open_outlined),
+            title: const Text('Restaurar desde archivo'),
+            subtitle: const Text('Elige un archivo de respaldo. Reemplaza TODA la información actual.'),
+            onTap: () => _restoreFromFile(context),
+          ),
+          const Divider(height: 1),
+          ListTile(
             leading: const Icon(Icons.download),
             title: const Text('Copiar respaldo'),
             subtitle: const Text('Copia toda tu información (formato JSON) al portapapeles para guardarla donde quieras.'),
@@ -79,7 +101,7 @@ class SettingsScreen extends StatelessWidget {
         ]),
       ),
       const SizedBox(height: 16),
-      const Center(child: Text('Drago · v0.5 · los datos se guardan primero en este dispositivo', style: TextStyle(fontSize: 12))),
+      const Center(child: Text('Drago · v1.0 · los datos se guardan primero en este dispositivo', style: TextStyle(fontSize: 12))),
     ]);
   }
 
@@ -131,6 +153,30 @@ class SettingsScreen extends StatelessWidget {
     if (ok != true || !context.mounted) return;
     await runOp(context, (l) => l.createAccount(name.text, kind, initialBalance: parseMoney(initial.text)!),
         success: 'Cuenta creada');
+  }
+
+  Future<void> _restoreFromFile(BuildContext context) async {
+    final files = await FilePicker.pickFiles(type: FileType.custom, allowedExtensions: const ['json']);
+    if (files.isEmpty || !context.mounted) return;
+    final String text;
+    try {
+      text = utf8.decode(await files.first.readAsBytes());
+    } catch (_) {
+      if (context.mounted) showMessage(context, 'No se pudo leer el archivo.', error: true);
+      return;
+    }
+    if (!context.mounted) return;
+    if (!await confirm(context, 'Reemplazar información', 'Toda tu información actual será reemplazada por el respaldo «${files.first.name}». ¿Continuar?',
+            action: 'Restaurar', danger: true) ||
+        !context.mounted) {
+      return;
+    }
+    try {
+      await AppScope.of(context).restoreBackup(text);
+      if (context.mounted) showMessage(context, 'Respaldo restaurado');
+    } on FinanceException catch (e) {
+      if (context.mounted) showMessage(context, e.message, error: true);
+    }
   }
 
   Future<void> _restore(BuildContext context) async {

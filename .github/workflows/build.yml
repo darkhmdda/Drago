@@ -89,6 +89,8 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
+      - name: Descargar lector de texto (Tesseract) para «Importar captura»
+        run: bash tool/fetch_ocr_web.sh
       - name: Compilar web
         run: flutter build web --release --no-web-resources-cdn --base-href "/${{ github.event.repository.name }}/"
       - uses: actions/upload-pages-artifact@v3

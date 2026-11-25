@@ -6,6 +6,7 @@ import '../domain/models.dart';
 import '../domain/money.dart';
 import 'common.dart';
 import 'dialogs.dart';
+import 'import_screen.dart';
 
 class DebtsScreen extends StatelessWidget {
   const DebtsScreen({super.key});
@@ -17,6 +18,15 @@ class DebtsScreen extends StatelessWidget {
     final closed = l.debts.where((d) => d.status != DebtStatus.active).toList();
 
     return PageBody(children: [
+      Card(
+        child: ListTile(
+          leading: const Icon(Icons.document_scanner_outlined),
+          title: const Text('Importar captura de estado de cuenta'),
+          subtitle: const Text('Actualiza cuotas desde una captura de DiDi, Coppel, Mercado Pago…'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ImportScreen())),
+        ),
+      ),
       Card(
         child: ListTile(
           title: const Text('Total pendiente de deudas activas'),
@@ -94,6 +104,7 @@ class DebtDetailScreen extends StatelessWidget {
             onSelected: (v) => _onMenu(context, v, d),
             itemBuilder: (_) => [
               const PopupMenuItem(value: 'edit', child: Text('Editar deuda')),
+              const PopupMenuItem(value: 'import', child: Text('Actualizar desde captura')),
               if (d.status != DebtStatus.cancelled) const PopupMenuItem(value: 'cancel', child: Text('Cancelar deuda')),
               if (d.status == DebtStatus.cancelled) const PopupMenuItem(value: 'reactivate', child: Text('Reactivar deuda')),
               const PopupMenuItem(value: 'delete', child: Text('Eliminar deuda')),
@@ -152,6 +163,8 @@ class DebtDetailScreen extends StatelessWidget {
     switch (v) {
       case 'edit':
         await showDebtForm(context, existing: d);
+      case 'import':
+        await Navigator.push(context, MaterialPageRoute(builder: (_) => ImportScreen(debtId: d.id)));
       case 'cancel':
         if (await confirm(context, 'Cancelar deuda', 'La deuda “${d.name}” dejará de contar como pendiente y sus cuotas no aparecerán en la agenda.', danger: true) &&
             context.mounted) {
