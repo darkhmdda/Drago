@@ -33,9 +33,10 @@ Future<void> main() async {
     );
     final client = Supabase.instance.client;
     auth = AuthService(client.auth);
-    sync = SyncService(state, SupabaseSyncRemote(client));
+    final remote = SupabaseSyncRemote(client);
+    sync = SyncService(state, remote);
     await sync.init();
-    _wireSync(client, sync);
+    _wireSync(client, remote, sync);
   } catch (e) {
     debugPrint('Sincronización no disponible: $e');
   }
@@ -43,13 +44,18 @@ Future<void> main() async {
   runApp(DragoApp(state: state, theme: theme, sync: sync, auth: auth));
 }
 
-void _wireSync(SupabaseClient client, SyncService sync) {
+void _wireSync(SupabaseClient client, SupabaseSyncRemote remote, SyncService sync) {
   client.auth.onAuthStateChange.listen((data) {
     switch (data.event) {
       case AuthChangeEvent.initialSession:
       case AuthChangeEvent.signedIn:
-        if (data.session != null) sync.sync();
+        if (data.session != null) {
+          sync.sync();
+          // Aviso inmediato cuando otro dispositivo sube cambios.
+          remote.listen(sync.checkRemote);
+        }
       case AuthChangeEvent.signedOut:
+        remote.stopListening();
         sync.forgetUser();
       case AuthChangeEvent.passwordRecovery:
         _askNewPassword(client);
@@ -57,9 +63,10 @@ void _wireSync(SupabaseClient client, SyncService sync) {
         break;
     }
   });
-  // Revisar cambios de otros dispositivos al volver a la app y cada 2 minutos.
-  AppLifecycleListener(onResume: sync.sync);
-  Timer.periodic(const Duration(minutes: 2), (_) => sync.sync());
+  // Respaldo del aviso en tiempo real: al volver a la app y cada 30 segundos
+  // se consulta solo el número de versión (se descarga todo únicamente si cambió).
+  AppLifecycleListener(onResume: sync.checkRemote);
+  Timer.periodic(const Duration(seconds: 30), (_) => sync.checkRemote());
 }
 
 /// El usuario abrió el enlace de «Olvidé mi contraseña».

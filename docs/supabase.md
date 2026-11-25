@@ -14,6 +14,14 @@ Drago guarda todo primero en el dispositivo y funciona sin conexión. Con una cu
 El script crea las tablas con RLS (cada usuario solo ve sus datos), los permisos solo para usuarios con sesión
 iniciada y las funciones `pull_ledger` / `push_ledger` que usa la app para sincronizar.
 
+### Actualizaciones del esquema
+
+Si ya ejecutaste una versión anterior del script, ejecuta solo los archivos nuevos de `supabase/migrations`:
+
+| Archivo | Para qué |
+|---|---|
+| `20261127000000_realtime.sql` | Avisos en tiempo real entre dispositivos |
+
 ## 2. Ajustes de autenticación
 
 En **Authentication → Sign In / Providers → Email**:
@@ -35,7 +43,8 @@ Después de crear tu cuenta, si nadie más va a usar la app, puedes desactivar *
 **Ajustes → Cuenta y sincronización → Iniciar sesión o crear cuenta.**
 
 - El icono de nube arriba a la derecha indica el estado: sincronizado, pendiente, sin conexión o con conflicto.
-- Cada cambio se sube unos segundos después. Al abrir la app y cada 2 minutos se revisan cambios de otros dispositivos.
+- Cada cambio se sube unos segundos después y los demás dispositivos lo reciben al instante (Supabase Realtime).
+  Como respaldo, cada 30 segundos y al volver a la app se consulta solo el número de versión.
 - Si cambiaste datos en dos dispositivos sin conexión, la app **no pisa nada**: te muestra las dos copias y eliges cuál
   conservar.
 

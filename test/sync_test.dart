@@ -29,6 +29,12 @@ class FakeRemote implements SyncRemote {
   }
 
   @override
+  Future<int> remoteVersion() async {
+    if (!cloud.online) throw const SyncFailure('Sin conexión');
+    return cloud.version;
+  }
+
+  @override
   Future<int> push(int baseVersion, Map<String, dynamic> data) async {
     if (!cloud.online) throw const SyncFailure('Sin conexión');
     if (baseVersion != cloud.version) throw const SyncConflict();
@@ -122,6 +128,24 @@ void main() {
     await Future<void>.delayed(const Duration(milliseconds: 50));
     expect(cloud.version, 1);
     expect(sa.hasPendingChanges, isFalse);
+  });
+
+  test('Revisión rápida: solo descarga si la nube cambió', () async {
+    final cloud = FakeCloud();
+    final (a, sa) = await device(cloud, 'A');
+    await a.run((l) => l.setBalance(accountId: cashOf(a), newBalance: 50000));
+    await sa.sync();
+    final (b, sb) = await device(cloud, 'B');
+    await sb.sync();
+    final remote = sb.remote as FakeRemote;
+    final before = cloud.data;
+    await sb.checkRemote(); // sin cambios en la nube: no descarga
+    expect(cloud.data, before);
+    await a.run((l) => l.addExpense(accountId: cashOf(a), amount: 8000, date: DateTime.now()));
+    await sa.sync();
+    await sb.checkRemote(); // la nube cambió: descarga
+    expect(b.ledger.totalAvailable, 42000);
+    expect(remote.userId, 'u1');
   });
 
   test('Sin sesión no se sincroniza nada', () async {

@@ -14,6 +14,45 @@ class SupabaseSyncRemote implements SyncRemote {
   @override
   String? get userEmail => client.auth.currentUser?.email;
 
+  @override
+  Future<int> remoteVersion() async {
+    try {
+      final row = await client.from('sync_state').select('version').maybeSingle();
+      return (row?['version'] as num?)?.toInt() ?? 0;
+    } on PostgrestException catch (e) {
+      throw SyncFailure(_explain(e));
+    } catch (_) {
+      throw const SyncFailure('Sin conexión. Los cambios se guardan aquí y se subirán después.');
+    }
+  }
+
+  RealtimeChannel? _channel;
+
+  /// Escucha en tiempo real los cambios de versión del usuario (cuando otro
+  /// dispositivo sube datos) y llama a [onChange]. Requiere que la tabla
+  /// sync_state esté en la publicación supabase_realtime.
+  void listen(void Function() onChange) {
+    final uid = userId;
+    stopListening();
+    if (uid == null) return;
+    _channel = client
+        .channel('drago-sync-$uid')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'sync_state',
+          filter: PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'user_id', value: uid),
+          callback: (_) => onChange(),
+        )
+        .subscribe();
+  }
+
+  void stopListening() {
+    final c = _channel;
+    _channel = null;
+    if (c != null) client.removeChannel(c);
+  }
+
   static String get deviceName => kIsWeb ? 'web' : defaultTargetPlatform.name;
 
   @override

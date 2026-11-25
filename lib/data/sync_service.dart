@@ -30,6 +30,9 @@ abstract class SyncRemote {
 
   /// Sube todos los datos. Lanza [SyncConflict] si [baseVersion] no es la actual.
   Future<int> push(int baseVersion, Map<String, dynamic> data);
+
+  /// Solo el número de versión en la nube (consulta mínima, para revisar seguido).
+  Future<int> remoteVersion();
 }
 
 enum SyncStatus { signedOut, idle, syncing, pending, offline, conflict }
@@ -171,6 +174,23 @@ class SyncService extends ChangeNotifier {
     if (_again && conflict == null) {
       _again = false;
       await sync();
+    }
+  }
+
+  /// Revisión rápida: pregunta solo la versión de la nube y sincroniza
+  /// únicamente si otro dispositivo subió cambios (o hay cambios locales).
+  /// La usan el aviso en tiempo real y la revisión periódica.
+  Future<void> checkRemote() async {
+    if (remote.userId == null || _busy || conflict != null) return;
+    if (_syncedUser != remote.userId || _dirty) return sync();
+    try {
+      final v = await remote.remoteVersion();
+      if (v != _base) await sync();
+    } on SyncFailure catch (e) {
+      lastError = e.message;
+      notifyListeners();
+    } catch (_) {
+      // Sin conexión: se reintentará en la próxima revisión.
     }
   }
 
