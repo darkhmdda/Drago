@@ -9,6 +9,7 @@ import '../domain/models.dart';
 import '../domain/money.dart';
 import '../domain/report.dart';
 import 'common.dart';
+import 'projections_view.dart';
 
 /// Reportes: resumen mensual y exportación a Excel / CSV.
 class ReportsScreen extends StatefulWidget {
@@ -52,6 +53,20 @@ _MonthData _monthData(Ledger l, DateTime m) {
 class _ReportsScreenState extends State<ReportsScreen> {
   late DateTime _month = DateTime(DateTime.now().year, DateTime.now().month);
   bool _busy = false;
+  int _tab = 0;
+
+  Widget get _tabs => Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: SegmentedButton<int>(
+          showSelectedIcon: false,
+          segments: const [
+            ButtonSegment(value: 0, label: Text('Mensual'), icon: Icon(Icons.bar_chart)),
+            ButtonSegment(value: 1, label: Text('Proyecciones'), icon: Icon(Icons.show_chart)),
+          ],
+          selected: {_tab},
+          onSelectionChanged: (v) => setState(() => _tab = v.first),
+        ),
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -61,7 +76,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
     final prev = _monthData(l, DateTime(_month.year, _month.month - 1));
     final label = toBeginningOfSentenceCase(DateFormat('MMMM y', 'es_MX').format(_month));
 
+    if (_tab == 1) return PageBody(children: [_tabs, const ProjectionsView()]);
     return PageBody(children: [
+      _tabs,
       Row(children: [
         IconButton(onPressed: () => setState(() => _month = DateTime(_month.year, _month.month - 1)), icon: const Icon(Icons.chevron_left)),
         Expanded(

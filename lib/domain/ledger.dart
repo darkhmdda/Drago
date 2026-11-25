@@ -2,6 +2,7 @@ import 'package:uuid/uuid.dart';
 
 import 'models.dart';
 import 'money.dart';
+import 'scenarios.dart';
 
 /// Error de validación de una operación financiera. Cuando se lanza,
 /// ningún dato ha sido modificado (las operaciones son atómicas).
@@ -122,6 +123,9 @@ class Ledger {
   final List<Recurrence> recurrences;
   final List<AuditEntry> auditLog;
 
+  /// Simulaciones guardadas (no afectan los datos reales).
+  final List<Scenario> scenarios;
+
   /// Reloj inyectable (para pruebas).
   DateTime Function() clock;
 
@@ -133,6 +137,7 @@ class Ledger {
     List<ScheduledItem>? scheduledItems,
     List<Recurrence>? recurrences,
     List<AuditEntry>? auditLog,
+    List<Scenario>? scenarios,
     DateTime Function()? clock,
   })  : accounts = accounts ?? [],
         transactions = transactions ?? [],
@@ -140,6 +145,7 @@ class Ledger {
         installments = installments ?? [],
         scheduledItems = scheduledItems ?? [],
         recurrences = recurrences ?? [],
+        scenarios = scenarios ?? [],
         auditLog = auditLog ?? [],
         clock = clock ?? DateTime.now;
 
@@ -867,6 +873,32 @@ class Ledger {
   }
 
   // -------------------------------------------------------------------------
+  // Simulaciones
+  // -------------------------------------------------------------------------
+
+  /// Guarda (o actualiza) una simulación. Solo guarda la definición: los
+  /// datos reales no se tocan.
+  Scenario saveScenario(Scenario s) {
+    if (s.name.trim().isEmpty) throw FinanceException('La simulación necesita un nombre.');
+    if (s.adjustments.isEmpty) throw FinanceException('Agrega al menos un cambio a la simulación.');
+    final idx = scenarios.indexWhere((x) => x.id == s.id);
+    if (idx >= 0) {
+      scenarios[idx] = s;
+    } else {
+      scenarios.add(s);
+    }
+    _audit(idx >= 0 ? 'Simulación editada' : 'Simulación guardada', s.name);
+    return s;
+  }
+
+  void deleteScenario(String id) {
+    final idx = scenarios.indexWhere((x) => x.id == id);
+    if (idx < 0) throw FinanceException('La simulación no existe.');
+    final s = scenarios.removeAt(idx);
+    _audit('Simulación eliminada', s.name);
+  }
+
+  // -------------------------------------------------------------------------
   // Calendario
   // -------------------------------------------------------------------------
 
@@ -1057,6 +1089,7 @@ class Ledger {
         'installments': installments.map((e) => e.toJson()).toList(),
         'scheduledItems': scheduledItems.map((e) => e.toJson()).toList(),
         'recurrences': recurrences.map((e) => e.toJson()).toList(),
+        'scenarios': scenarios.map((e) => e.toJson()).toList(),
         'auditLog': auditLog.map((e) => e.toJson()).toList(),
       };
 
@@ -1075,6 +1108,7 @@ class Ledger {
       // 'scheduledIncomes' es el nombre usado en la v0.2.
       scheduledItems: list(j.containsKey('scheduledItems') ? 'scheduledItems' : 'scheduledIncomes', ScheduledItem.fromJson),
       recurrences: list('recurrences', Recurrence.fromJson),
+      scenarios: list('scenarios', Scenario.fromJson),
       auditLog: list('auditLog', AuditEntry.fromJson),
       clock: clock,
     );

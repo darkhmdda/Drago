@@ -11,7 +11,20 @@ class FinPalette extends ThemeExtension<FinPalette> {
   final Color paid;
   final Color neutral;
 
-  const FinPalette({required this.income, required this.expense, required this.pending, required this.paid, required this.neutral});
+  /// Series de las gráficas (validadas para daltonismo y contraste en cada tema):
+  /// proyección base y simulación.
+  final Color chartBase;
+  final Color chartScenario;
+
+  const FinPalette({
+    required this.income,
+    required this.expense,
+    required this.pending,
+    required this.paid,
+    required this.neutral,
+    required this.chartBase,
+    required this.chartScenario,
+  });
 
   @override
   FinPalette copyWith({Color? income, Color? expense, Color? pending, Color? paid, Color? neutral}) => FinPalette(
@@ -20,6 +33,8 @@ class FinPalette extends ThemeExtension<FinPalette> {
         pending: pending ?? this.pending,
         paid: paid ?? this.paid,
         neutral: neutral ?? this.neutral,
+        chartBase: chartBase,
+        chartScenario: chartScenario,
       );
 
   @override
@@ -31,6 +46,8 @@ class FinPalette extends ThemeExtension<FinPalette> {
       pending: Color.lerp(pending, other.pending, t)!,
       paid: Color.lerp(paid, other.paid, t)!,
       neutral: Color.lerp(neutral, other.neutral, t)!,
+      chartBase: Color.lerp(chartBase, other.chartBase, t)!,
+      chartScenario: Color.lerp(chartScenario, other.chartScenario, t)!,
     );
   }
 }
@@ -89,13 +106,17 @@ ThemeData _classic(Brightness b) {
               expense: Color(0xFFC0392B),
               pending: Color(0xFFB9770E),
               paid: Color(0xFF2E6DA4),
-              neutral: Color(0xFF5D6D7E))
+              neutral: Color(0xFF5D6D7E),
+              chartBase: Color(0xFF2E6DA4),
+              chartScenario: Color(0xFFB9770E))
           : const FinPalette(
               income: Color(0xFF4CC38A),
               expense: Color(0xFFFF6B5E),
               pending: Color(0xFFF5B041),
               paid: Color(0xFF6FA8DC),
-              neutral: Color(0xFFA0AAB4)),
+              neutral: Color(0xFFA0AAB4),
+              chartBase: Color(0xFF4A90E2),
+              chartScenario: Color(0xFFD4822A)),
     ],
   );
 }
@@ -138,6 +159,8 @@ ThemeData _ryusui() {
         pending: Color(0xFFBF5F14), // naranja #E77A27 oscurecido para leerse sobre fondo claro
         paid: Color(0xFF65402D),
         neutral: Color(0xFF8C7A63),
+        chartBase: Color(0xFF2455A4),
+        chartScenario: Color(0xFFBF5F14),
       ),
     ],
   );
@@ -187,6 +210,8 @@ ThemeData _nami() {
         pending: Color(0xFFA6820A), // amarillo #E1BE2A oscurecido para leerse sobre fondo claro
         paid: Color(0xFF79482C),
         neutral: Color(0xFF8F7B6E),
+        chartBase: Color(0xFF226AA8),
+        chartScenario: Color(0xFFA6820A),
       ),
     ],
   );
