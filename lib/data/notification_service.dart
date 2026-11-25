@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/painting.dart' show Color;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest_all.dart' as tzdata;
@@ -49,7 +50,7 @@ class NotificationService extends ChangeNotifier {
       try {
         tzdata.initializeTimeZones();
         await _plugin.initialize(
-          settings: const InitializationSettings(android: AndroidInitializationSettings('@mipmap/ic_launcher')),
+          settings: const InitializationSettings(android: AndroidInitializationSettings('@drawable/ic_stat_drago')),
         );
         _systemReady = true;
         permissionGranted = await _android?.areNotificationsEnabled();
@@ -95,6 +96,8 @@ class NotificationService extends ChangeNotifier {
       importance: Importance.high,
       priority: Priority.high,
       styleInformation: BigTextStyleInformation(''),
+      icon: '@drawable/ic_stat_drago',
+      color: Color(0xFF8A5A00),
     ),
   );
 
@@ -117,6 +120,8 @@ class NotificationService extends ChangeNotifier {
               importance: Importance.high,
               priority: Priority.high,
               styleInformation: BigTextStyleInformation(r.body),
+              icon: '@drawable/ic_stat_drago',
+              color: const Color(0xFF8A5A00),
             ),
           ),
           androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
