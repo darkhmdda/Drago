@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:archive/archive.dart';
 import 'package:drago/data/exporter.dart';
+import 'package:drago/data/pdf_export.dart';
 import 'package:drago/domain/ledger.dart';
 import 'package:drago/domain/models.dart';
 import 'package:drago/domain/reminders.dart';
@@ -129,6 +130,13 @@ void main() {
         expect(workbook, contains('name="$name"'));
       }
       expect(workbook, isNot(contains('Sheet1')));
+    });
+
+    test('PDF válido con acentos y varias secciones', () async {
+      final bytes = await buildPdf(buildReport(l, Period.month(DateTime(2026, 11), 'Noviembre')),
+          title: 'Reporte financiero · Noviembre', subtitle: 'Generado → hoy');
+      expect(String.fromCharCodes(bytes.take(5)), '%PDF-');
+      expect(bytes.length, greaterThan(3000));
     });
 
     test('Periodo: movimientos fuera del rango no se incluyen', () {

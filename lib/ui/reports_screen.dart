@@ -3,6 +3,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../data/app_state.dart';
 import '../data/exporter.dart';
+import '../data/pdf_export.dart';
 import '../domain/ledger.dart';
 import '../domain/models.dart';
 import '../domain/money.dart';
@@ -110,6 +111,15 @@ class _ReportsScreenState extends State<ReportsScreen> {
           ),
           const Divider(height: 1),
           ListTile(
+            leading: const Icon(Icons.picture_as_pdf_outlined),
+            title: const Text('Reporte en PDF'),
+            subtitle: const Text('El mismo contenido, listo para imprimir o compartir'),
+            trailing: const Icon(Icons.download),
+            enabled: !_busy,
+            onTap: () => _export(ReportScope.full, csv: false, pdf: true),
+          ),
+          const Divider(height: 1),
+          ListTile(
             leading: const Icon(Icons.credit_card),
             title: const Text('Solo deudas'),
             subtitle: const Text('Deudas y todas sus cuotas (.xlsx)'),
@@ -196,7 +206,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
     );
   }
 
-  Future<void> _export(ReportScope scope, {required bool csv, bool askPeriod = true}) async {
+  Future<void> _export(ReportScope scope, {required bool csv, bool pdf = false, bool askPeriod = true}) async {
     final l = AppScope.of(context).ledger;
     final now = DateTime.now();
     final period = askPeriod ? await _askPeriod() : Period(DateTime(2000), DateTime(now.year + 5, 12, 31), 'Todas las deudas');
@@ -205,7 +215,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
     try {
       final stamp = DateFormat('yyyy-MM-dd').format(now);
       final tables = buildReport(l, period, scope: scope);
-      if (csv) {
+      if (pdf) {
+        final bytes = await buildPdf(tables, title: 'Reporte financiero · ${period.label}', subtitle: 'Generado el ${fmtDate(now)}');
+        await saveFile(bytes, 'drago_reporte_$stamp.pdf', pdfMime);
+      } else if (csv) {
         await saveFile(buildCsv(tables.first), 'drago_movimientos_$stamp.csv', csvMime);
       } else {
         final name = scope == ReportScope.debtsOnly ? 'drago_deudas_$stamp.xlsx' : 'drago_reporte_$stamp.xlsx';
