@@ -79,7 +79,7 @@ class SettingsScreen extends StatelessWidget {
         ]),
       ),
       const SizedBox(height: 16),
-      const Center(child: Text('Drago · v0.4 · los datos se guardan primero en este dispositivo', style: TextStyle(fontSize: 12))),
+      const Center(child: Text('Drago · v0.5 · los datos se guardan primero en este dispositivo', style: TextStyle(fontSize: 12))),
     ]);
   }
 

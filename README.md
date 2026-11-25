@@ -7,17 +7,17 @@ La especificación completa está en [`docs/especificacion.md`](docs/especificac
 
 > Regla principal: **nunca confundir el dinero que realmente tienes con el dinero que esperas recibir.**
 
-## Estado actual: v0.4 (notificaciones y reportes)
+## Estado actual: v0.5 (proyecciones) + asistente
 
 | Versión | Contenido | Estado |
 |---|---|---|
 | 0.1 | Saldo físico / digital / total, ingresos, gastos, transferencias, historial | ✅ |
 | 0.2 | Deudas, cuotas variables, pagos y abonos parciales, saldo pendiente | ✅ |
 | 0.3 | Calendario mensual, semanal y agenda; ingresos y gastos recurrentes; pagos integrados | ✅ |
-| 0.4 | Recordatorios de pagos, centro de notificaciones, reportes mensuales, exportación Excel/CSV | ✅ |
-| 0.5 | Proyecciones y escenarios | 🟡 Saldo proyectado y alerta de saldo negativo |
+| 0.4 | Recordatorios de pagos, centro de notificaciones, reportes mensuales, exportación Excel/CSV/PDF | ✅ |
+| 0.5 | Proyecciones, gráfica, simulaciones guardables y comparación | ✅ |
 | — | Cuenta y sincronización con Supabase (adelantado de la 1.0) | ✅ Ver [docs/supabase.md](docs/supabase.md) |
-| 1.0 | Asistente, capturas | ⏳ |
+| 1.0 | Asistente en lenguaje natural (por reglas, sin IA) ✅ · Importar capturas ⏳ | 🟡 |
 
 ### Lo que ya funciona
 - **Inicio**: dinero físico, dinero digital y total disponible (solo dinero real), próximo pago, próximo ingreso,
@@ -34,6 +34,12 @@ La especificación completa está en [`docs/especificacion.md`](docs/especificac
   - Cada fecha se **confirma por separado** (con el importe real), se marca como **no recibida** o se **ajusta**
     sin tocar la regla. Las cuotas de las deudas aparecen solas y vinculadas a su cuota original: nunca se duplican.
   - La agenda muestra el **saldo proyectado** después de cada evento; los ingresos atrasados no se suman hasta confirmarse.
+- **Proyecciones** (Reportes → Proyecciones): gráfica del saldo proyectado a 30/60/90 días y simulaciones guardables
+  (ingreso extra o recurrente, gasto extraordinario, periodo sin ingresos, cambiar un recurrente, adelantar una cuota)
+  comparadas con la proyección base. Nunca modifican los datos reales.
+- **Asistente** (icono de chat): «Hoy gasté 80 en comida», «Recibí 400», «Pagué DiDi», «Cambió la cuota de Coppel a 450»,
+  «¿Cuánto debo en diciembre?», «¿Cuánto tenía el 20 de noviembre?», «Simula diciembre con 400 semanales». Funciona sin
+  IA ni conexión; pregunta cuando hay varias opciones y siempre pide confirmación antes de modificar datos.
 - **Cuenta y sincronización** (opcional): inicio de sesión con correo; los datos se guardan primero en el dispositivo
   y se sincronizan con Supabase; si dos dispositivos cambian a la vez, la app pregunta qué copia conservar.
 - **Temas**: Clásico, Clásico oscuro, Ryusui y Nami (Ajustes → Apariencia), con colores de ingresos, gastos y pendientes adaptados a cada uno.

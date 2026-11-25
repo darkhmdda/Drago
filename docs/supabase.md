@@ -21,6 +21,7 @@ Si ya ejecutaste una versión anterior del script, ejecuta solo los archivos nue
 | Archivo | Para qué |
 |---|---|
 | `20261127000000_realtime.sql` | Avisos en tiempo real entre dispositivos |
+| `20261128000000_scenarios.sql` | Sincronizar las simulaciones guardadas |
 
 ## 2. Ajustes de autenticación
 

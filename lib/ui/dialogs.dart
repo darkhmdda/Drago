@@ -4,6 +4,7 @@ import '../data/app_state.dart';
 import '../domain/models.dart';
 import '../domain/money.dart';
 import 'common.dart';
+import 'assistant_screen.dart';
 import 'scheduled_dialogs.dart';
 
 const expenseCategories = ['Comida', 'Transporte', 'Servicios', 'Hogar', 'Salud', 'Entretenimiento', 'Compras', 'Otros'];
@@ -229,6 +230,12 @@ Future<void> showQuickActions(BuildContext context) async {
     builder: (c) => SafeArea(
       child: SingleChildScrollView(
         child: Column(mainAxisSize: MainAxisSize.min, children: [
+          ListTile(
+            leading: const Icon(Icons.chat_bubble_outline),
+            title: const Text('Escribirlo al asistente'),
+            subtitle: const Text('Ej. «Hoy gasté 80 en comida»'),
+            onTap: () => Navigator.pop(c, 9),
+          ),
           const _SheetLabel('Dinero real'),
           ListTile(leading: Icon(Icons.remove_circle_outline, color: FinColors.of(context).expense), title: const Text('Gasto'), onTap: () => Navigator.pop(c, 0)),
           ListTile(leading: Icon(Icons.add_circle_outline, color: FinColors.of(context).income), title: const Text('Ingreso recibido'), onTap: () => Navigator.pop(c, 1)),
@@ -252,6 +259,8 @@ Future<void> showQuickActions(BuildContext context) async {
       await showScheduledForm(context, isIncome: true);
     case 4:
       await showScheduledForm(context, isIncome: false);
+    case 9:
+      await Navigator.push(context, MaterialPageRoute(builder: (_) => const AssistantScreen()));
   }
 }
 

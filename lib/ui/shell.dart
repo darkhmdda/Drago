@@ -1,5 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 
+import 'assistant_screen.dart';
 import 'calendar_screen.dart';
 import 'debts_screen.dart';
 import 'dialogs.dart';
@@ -54,6 +55,11 @@ class _AppShellState extends State<AppShell> {
       appBar: AppBar(
         title: Text(_titles[_index]),
         actions: [
+          IconButton(
+            tooltip: 'Asistente',
+            icon: const Icon(Icons.chat_bubble_outline),
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AssistantScreen())),
+          ),
           const NotificationBell(),
           SyncIndicator(onTap: () => openSettings(context)),
           IconButton(tooltip: 'Ajustes', icon: const Icon(Icons.settings_outlined), onPressed: () => openSettings(context)),
