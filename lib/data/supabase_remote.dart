@@ -78,7 +78,7 @@ class AuthService {
       final r = await auth.signUp(
         email: email.trim(),
         password: password,
-        emailRedirectTo: kIsWeb ? Uri.base.origin : null,
+        emailRedirectTo: kIsWeb ? _appUrl : null,
       );
       return r.session != null;
     } on AuthException catch (e) {
@@ -90,13 +90,17 @@ class AuthService {
 
   Future<void> resetPassword(String email) async {
     try {
-      await auth.resetPasswordForEmail(email.trim(), redirectTo: kIsWeb ? Uri.base.origin : null);
+      await auth.resetPasswordForEmail(email.trim(), redirectTo: kIsWeb ? _appUrl : null);
     } on AuthException catch (e) {
       throw AuthFailure(_translate(e.message));
     }
   }
 
   Future<void> signOut() => auth.signOut();
+
+  /// Dirección de la app web incluida la ruta (por ejemplo, GitHub Pages
+  /// la sirve en https://usuario.github.io/Drago/).
+  static String get _appUrl => '${Uri.base.origin}${Uri.base.path}';
 
   static String _translate(String m) {
     final s = m.toLowerCase();

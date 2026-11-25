@@ -81,7 +81,7 @@ Compilar la versión web (sin depender de CDN, funciona sin conexión a gstatic)
 flutter build web --release --no-web-resources-cdn
 ```
 
-Compilar el APK de Android (requiere Android SDK):
+Compilar el APK de Android (requiere Android SDK). La compilación y publicación automáticas están en [docs/publicacion.md](docs/publicacion.md):
 
 ```bash
 flutter build apk --release

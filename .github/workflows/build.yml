@@ -1,0 +1,109 @@
+# Compila y publica Drago en cada cambio de la rama principal:
+#  - Pruebas y análisis.
+#  - APK de Android, publicado como versión «android-latest» (enlace fijo).
+#  - Versión web, publicada en GitHub Pages.
+name: Compilar y publicar
+
+on:
+  push:
+    branches: [main, claude/zealous-cerf-qh0xse]
+  workflow_dispatch:
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FLUTTER_VERSION: '3.50.1'
+
+jobs:
+  pruebas:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
+
+  android:
+    needs: pruebas
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # para publicar el APK como versión
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+
+      - name: Preparar llave de firma
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ] && [ -n "$KEYSTORE_PASSWORD" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/drago-release.jks"
+            echo "DRAGO_KEYSTORE_PATH=$RUNNER_TEMP/drago-release.jks" >> "$GITHUB_ENV"
+            echo "DRAGO_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
+            echo "Firmando con la llave de Drago."
+          else
+            echo "::warning::Faltan los secretos ANDROID_KEYSTORE_BASE64 / ANDROID_KEYSTORE_PASSWORD. Se firma con una llave temporal: el APK no podrá instalarse encima de otra versión."
+          fi
+
+      - name: Compilar APK
+        run: flutter build apk --release --build-number=${{ github.run_number }}
+
+      - name: Publicar APK (versión android-latest)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp build/app/outputs/flutter-apk/app-release.apk drago.apk
+          VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //; s/+.*//')
+          gh release delete android-latest --yes --cleanup-tag || true
+          gh release create android-latest drago.apk \
+            --target "$GITHUB_SHA" \
+            --title "Drago para Android · v$VERSION (compilación ${{ github.run_number }})" \
+            --notes "Descarga **drago.apk** desde el teléfono e instálalo. Compilado desde ${GITHUB_SHA::7}." \
+            --latest
+
+  web:
+    needs: pruebas
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: Compilar web
+        run: flutter build web --release --no-web-resources-cdn --base-href "/${{ github.event.repository.name }}/"
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+
+  publicar-web:
+    needs: web
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4

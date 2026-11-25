@@ -15,7 +15,6 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.drago.app"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
@@ -29,11 +28,30 @@ android {
         versionName = flutter.versionName
     }
 
+    // Firma de la versión release. La llave NO está en el repositorio: el flujo de
+    // GitHub Actions la crea a partir de los secretos ANDROID_KEYSTORE_BASE64 y
+    // ANDROID_KEYSTORE_PASSWORD y pasa su ruta en DRAGO_KEYSTORE_PATH.
+    // Sin esas variables se firma con la llave de depuración (sirve para probar,
+    // pero no permite actualizar encima de una versión firmada con otra llave).
+    val releaseKeystore = System.getenv("DRAGO_KEYSTORE_PATH")?.let { file(it) }?.takeIf { it.exists() }
+    signingConfigs {
+        if (releaseKeystore != null) {
+            create("release") {
+                storeFile = releaseKeystore
+                storePassword = System.getenv("DRAGO_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("DRAGO_KEY_ALIAS") ?: "drago"
+                keyPassword = System.getenv("DRAGO_KEYSTORE_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (releaseKeystore != null) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 }

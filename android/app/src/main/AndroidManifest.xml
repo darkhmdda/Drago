@@ -1,4 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Necesario para la sincronización con Supabase en la versión release. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="Drago"
         android:name="${applicationName}"
