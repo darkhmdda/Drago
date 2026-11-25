@@ -1,4 +1,6 @@
-# FinanSync *(nombre provisional)*
+# Drago
+
+*Antes llamado provisionalmente «FinanSync» en los documentos de especificación.*
 
 Aplicación de administración financiera personal para **web** y **Android**, hecha con Flutter.
 La especificación completa está en [`docs/especificacion.md`](docs/especificacion.md).

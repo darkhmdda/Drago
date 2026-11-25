@@ -1,4 +1,4 @@
-package com.finansync.finansync
+package com.drago.app
 
 import io.flutter.embedding.android.FlutterActivity
 

@@ -1,10 +1,10 @@
 import 'dart:convert';
 
-import 'package:finansync/data/app_state.dart';
-import 'package:finansync/data/storage.dart';
-import 'package:finansync/domain/ledger.dart';
-import 'package:finansync/domain/models.dart';
-import 'package:finansync/domain/money.dart';
+import 'package:drago/data/app_state.dart';
+import 'package:drago/data/storage.dart';
+import 'package:drago/domain/ledger.dart';
+import 'package:drago/domain/models.dart';
+import 'package:drago/domain/money.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

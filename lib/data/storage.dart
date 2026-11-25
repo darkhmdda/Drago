@@ -14,13 +14,17 @@ abstract class LedgerStorage {
 }
 
 class PrefsLedgerStorage implements LedgerStorage {
-  static const _key = 'finansync.ledger.v1';
-  static const _backupKey = 'finansync.ledger.v1.previous';
+  static const _key = 'drago.ledger.v1';
+  static const _backupKey = 'drago.ledger.v1.previous';
+
+  /// Claves usadas cuando la app se llamaba provisionalmente «FinanSync».
+  /// Se leen como respaldo para no perder datos ya capturados.
+  static const _legacyKeys = ['finansync.ledger.v1', 'finansync.ledger.v1.previous'];
 
   @override
   Future<Ledger?> load() async {
     final prefs = await SharedPreferences.getInstance();
-    for (final key in [_key, _backupKey]) {
+    for (final key in [_key, _backupKey, ..._legacyKeys]) {
       final raw = prefs.getString(key);
       if (raw == null) continue;
       try {

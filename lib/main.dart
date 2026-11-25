@@ -11,12 +11,12 @@ Future<void> main() async {
   Intl.defaultLocale = 'es_MX';
   await initializeDateFormatting('es_MX');
   final state = await AppState.open(PrefsLedgerStorage());
-  runApp(FinanSyncApp(state: state));
+  runApp(DragoApp(state: state));
 }
 
-class FinanSyncApp extends StatelessWidget {
+class DragoApp extends StatelessWidget {
   final AppState state;
-  const FinanSyncApp({super.key, required this.state});
+  const DragoApp({super.key, required this.state});
 
   @override
   Widget build(BuildContext context) {
@@ -24,7 +24,7 @@ class FinanSyncApp extends StatelessWidget {
     return AppScope(
       state: state,
       child: MaterialApp(
-        title: 'FinanSync',
+        title: 'Drago',
         debugShowCheckedModeBanner: false,
         locale: const Locale('es', 'MX'),
         supportedLocales: const [Locale('es', 'MX'), Locale('es'), Locale('en')],

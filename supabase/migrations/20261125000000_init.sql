@@ -1,4 +1,4 @@
--- FinanSync · esquema inicial para Supabase (PostgreSQL)
+-- Drago · esquema inicial para Supabase (PostgreSQL)
 -- Reglas: UUID como identificadores, claves foráneas, dinero en centavos
 -- enteros (bigint, nunca float), RLS por usuario y auditoría.
 -- Este esquema refleja el modelo de lib/domain/models.dart; la app v0.2 aún

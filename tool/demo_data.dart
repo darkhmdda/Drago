@@ -3,8 +3,8 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:finansync/domain/ledger.dart';
-import 'package:finansync/domain/models.dart';
+import 'package:drago/domain/ledger.dart';
+import 'package:drago/domain/models.dart';
 
 void main() {
   final l = Ledger.withDefaults();
