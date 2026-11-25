@@ -73,4 +73,6 @@ flutter {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+    // Temas AppCompat (requeridos por el bloqueo con huella en Android 8 y anteriores).
+    implementation("androidx.appcompat:appcompat:1.7.1")
 }

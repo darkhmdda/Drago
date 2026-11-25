@@ -88,6 +88,9 @@ def main():
         '    <color name="notification_accent">#8A5A00</color>\n</resources>\n'
     )
 
+    # Emblema pequeño para usar dentro de la app (pantalla de bloqueo, etc.).
+    place(em, 256, 1.0).save(ROOT / "assets/icon/emblema_256.png", optimize=True)
+
     web = ROOT / "web"
     place(em, 64, 1.0).save(web / "favicon.png", optimize=True)
     for s in (192, 512):

@@ -15,6 +15,8 @@ import '../data/sync_service.dart';
 import 'sync_widgets.dart';
 import 'themes.dart';
 import 'notifications_screen.dart';
+import 'lock_screen.dart';
+import '../data/app_lock.dart';
 import '../domain/reminders.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -51,6 +53,8 @@ class SettingsScreen extends StatelessWidget {
             ),
           ),
         ),
+      const SectionTitle('Seguridad'),
+      const _SecuritySection(),
       const SectionTitle('Recordatorios'),
       const _ReminderSettings(),
       const SectionTitle('Apariencia'),
@@ -488,5 +492,118 @@ class _ReminderSettings extends StatelessWidget {
         ]),
       ),
     );
+  }
+}
+
+class _SecuritySection extends StatelessWidget {
+  const _SecuritySection();
+
+  @override
+  Widget build(BuildContext context) {
+    final lock = AppLockScope.of(context);
+    return Card(
+      child: Column(children: [
+        SwitchListTile(
+          secondary: const Icon(Icons.lock_outline),
+          title: const Text('Bloquear Drago'),
+          subtitle: Text(!lock.enabled
+              ? 'Pide desbloquear al abrir la app y al volver después de 1 minuto.'
+              : lock.method == LockMethod.device
+                  ? 'Con el bloqueo del teléfono (huella, rostro, PIN o patrón).'
+                  : 'Con PIN de Drago.'),
+          value: lock.enabled,
+          onChanged: (on) async {
+            if (!on) {
+              final ok = lock.method == LockMethod.device ? await lock.unlockWithDevice() : await _askPin(context, lock, verify: true);
+              if (ok) await lock.disable();
+              return;
+            }
+            if (await lock.deviceAuthAvailable()) {
+              final ok = await lock.enableDevice();
+              if (!ok && context.mounted) showMessage(context, 'No se pudo verificar. El bloqueo no se activó.', error: true);
+            } else if (context.mounted) {
+              await _askPin(context, lock, verify: false);
+            }
+          },
+        ),
+        if (lock.enabled && lock.method == LockMethod.pin)
+          ListTile(
+            leading: const Icon(Icons.pin_outlined),
+            title: const Text('Cambiar PIN'),
+            onTap: () async {
+              if (await _askPin(context, lock, verify: true) && context.mounted) await _askPin(context, lock, verify: false);
+            },
+          ),
+        if (!lock.deviceAuthPlatform)
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: Text('En la web el bloqueo evita que alguien vea tus datos al abrir la página en este navegador. '
+                'Cierra sesión en computadoras compartidas.', style: TextStyle(fontSize: 12)),
+          ),
+      ]),
+    );
+  }
+
+  /// verify=true: pide el PIN actual. verify=false: crea uno nuevo (dos veces).
+  Future<bool> _askPin(BuildContext context, AppLock lock, {required bool verify}) async {
+    final a = TextEditingController(), b = TextEditingController();
+    String? error;
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (d) => StatefulBuilder(
+        builder: (d, setState) => AlertDialog(
+          title: Text(verify ? 'Escribe tu PIN' : 'Crea un PIN de Drago'),
+          content: Column(mainAxisSize: MainAxisSize.min, children: [
+            if (!verify) const Text('De 4 a 8 números. Por seguridad no se puede recuperar si lo olvidas.', style: TextStyle(fontSize: 13)),
+            const SizedBox(height: 8),
+            TextField(
+              controller: a,
+              autofocus: true,
+              obscureText: true,
+              keyboardType: TextInputType.number,
+              maxLength: 8,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              decoration: const InputDecoration(labelText: 'PIN', border: OutlineInputBorder(), counterText: ''),
+            ),
+            if (!verify) ...[
+              const SizedBox(height: 8),
+              TextField(
+                controller: b,
+                obscureText: true,
+                keyboardType: TextInputType.number,
+                maxLength: 8,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                decoration: const InputDecoration(labelText: 'Repite el PIN', border: OutlineInputBorder(), counterText: ''),
+              ),
+            ],
+            if (error != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(error!, style: TextStyle(color: Theme.of(d).colorScheme.error))),
+          ]),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancelar')),
+            FilledButton(
+              onPressed: () {
+                if (verify) {
+                  if (lock.checkPin(a.text)) {
+                    Navigator.pop(d, true);
+                  } else {
+                    setState(() => error = 'PIN incorrecto');
+                  }
+                  return;
+                }
+                if (a.text.length < 4) return setState(() => error = 'Usa al menos 4 números');
+                if (a.text != b.text) return setState(() => error = 'Los PIN no coinciden');
+                Navigator.pop(d, true);
+              },
+              child: const Text('Aceptar'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (result == true && !verify) {
+      await lock.enablePin(a.text);
+      if (context.mounted) showMessage(context, 'Bloqueo activado');
+    }
+    return result == true;
   }
 }

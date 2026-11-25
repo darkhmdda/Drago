@@ -12,6 +12,8 @@ import 'data/supabase_remote.dart';
 import 'data/sync_scope.dart';
 import 'data/sync_service.dart';
 import 'data/notification_service.dart';
+import 'data/app_lock.dart';
+import 'ui/lock_screen.dart';
 import 'ui/notifications_screen.dart';
 import 'ui/shell.dart';
 import 'ui/themes.dart';
@@ -24,6 +26,8 @@ Future<void> main() async {
   await initializeDateFormatting('es_MX');
   final state = await AppState.open(PrefsLedgerStorage());
   final theme = await ThemeController.load();
+  final lock = AppLock();
+  await lock.load();
 
   // La nube es opcional: si no se puede iniciar, la app funciona solo en local.
   SyncService? sync;
@@ -56,6 +60,7 @@ Future<void> main() async {
     DragoApp(
       state: state,
       theme: theme,
+      lock: lock,
       sync: sync,
       auth: auth,
       notifications: notifications,
@@ -140,6 +145,7 @@ Future<void> _askNewPassword(SupabaseClient client) async {
 class DragoApp extends StatelessWidget {
   final AppState state;
   final ThemeController theme;
+  final AppLock lock;
   final SyncService? sync;
   final AuthService? auth;
   final NotificationService? notifications;
@@ -147,6 +153,7 @@ class DragoApp extends StatelessWidget {
     super.key,
     required this.state,
     required this.theme,
+    required this.lock,
     this.sync,
     this.auth,
     this.notifications,
@@ -154,30 +161,34 @@ class DragoApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AppScope(
-      state: state,
-      child: SyncScope(
-        sync: sync,
-        auth: auth,
-        child: NotificationScope(
-          service: notifications,
-          child: ThemeScope(
-            controller: theme,
-            child: ListenableBuilder(
-              listenable: theme,
-              builder: (context, _) => MaterialApp(
-                navigatorKey: navigatorKey,
-                title: 'Drago',
-                debugShowCheckedModeBanner: false,
-                locale: const Locale('es', 'MX'),
-                supportedLocales: const [
-                  Locale('es', 'MX'),
-                  Locale('es'),
-                  Locale('en'),
-                ],
-                localizationsDelegates: GlobalMaterialLocalizations.delegates,
-                theme: theme.theme.data,
-                home: const AppShell(),
+    return AppLockScope(
+      lock: lock,
+      child: AppScope(
+        state: state,
+        child: SyncScope(
+          sync: sync,
+          auth: auth,
+          child: NotificationScope(
+            service: notifications,
+            child: ThemeScope(
+              controller: theme,
+              child: ListenableBuilder(
+                listenable: theme,
+                builder: (context, _) => MaterialApp(
+                  navigatorKey: navigatorKey,
+                  title: 'Drago',
+                  debugShowCheckedModeBanner: false,
+                  locale: const Locale('es', 'MX'),
+                  supportedLocales: const [
+                    Locale('es', 'MX'),
+                    Locale('es'),
+                    Locale('en'),
+                  ],
+                  localizationsDelegates: GlobalMaterialLocalizations.delegates,
+                  theme: theme.theme.data,
+                  home: const AppShell(),
+                  builder: (context, child) => LockGate(child: child!),
+                ),
               ),
             ),
           ),
