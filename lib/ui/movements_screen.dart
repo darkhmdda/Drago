@@ -79,7 +79,7 @@ class _TxTile extends StatelessWidget {
       TxType.transfer => Icons.swap_horiz,
       TxType.adjustment => Icons.tune,
     };
-    final color = t.type == TxType.transfer && focusAccount == null ? FinColors.neutral : amountColor(shown);
+    final color = t.type == TxType.transfer && focusAccount == null ? FinColors.of(context).neutral : amountColor(context, shown);
     return Card(
       child: ListTile(
         leading: CircleAvatar(backgroundColor: color.withValues(alpha: 0.12), child: Icon(icon, color: color, size: 20)),

@@ -229,7 +229,7 @@ Future<void> showEditOccurrenceDialog(BuildContext context, CalendarEvent e) asy
 /// Acciones disponibles para un evento del calendario.
 Future<void> showEventActions(BuildContext context, CalendarEvent e) async {
   final l = AppScope.of(context).ledger;
-  final color = eventColor(e);
+  final color = eventColor(context, e);
   final actions = <(IconData, String, Future<void> Function())>[];
 
   if (e.installmentId != null) {
@@ -302,11 +302,11 @@ Future<void> showEventActions(BuildContext context, CalendarEvent e) async {
   if (picked != null && context.mounted) await actions[picked].$3();
 }
 
-Color eventColor(CalendarEvent e) {
-  if (e.skipped) return FinColors.neutral;
-  if (e.done) return e.isIncome ? FinColors.income : FinColors.paid;
-  if (e.overdue && !e.isIncome) return FinColors.expense;
-  return e.isIncome ? FinColors.income : FinColors.pending;
+Color eventColor(BuildContext context, CalendarEvent e) {
+  if (e.skipped) return FinColors.of(context).neutral;
+  if (e.done) return e.isIncome ? FinColors.of(context).income : FinColors.of(context).paid;
+  if (e.overdue && !e.isIncome) return FinColors.of(context).expense;
+  return e.isIncome ? FinColors.of(context).income : FinColors.of(context).pending;
 }
 
 IconData eventIcon(CalendarEvent e) {

@@ -230,12 +230,12 @@ Future<void> showQuickActions(BuildContext context) async {
       child: SingleChildScrollView(
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           const _SheetLabel('Dinero real'),
-          ListTile(leading: const Icon(Icons.remove_circle_outline, color: FinColors.expense), title: const Text('Gasto'), onTap: () => Navigator.pop(c, 0)),
-          ListTile(leading: const Icon(Icons.add_circle_outline, color: FinColors.income), title: const Text('Ingreso recibido'), onTap: () => Navigator.pop(c, 1)),
+          ListTile(leading: Icon(Icons.remove_circle_outline, color: FinColors.of(context).expense), title: const Text('Gasto'), onTap: () => Navigator.pop(c, 0)),
+          ListTile(leading: Icon(Icons.add_circle_outline, color: FinColors.of(context).income), title: const Text('Ingreso recibido'), onTap: () => Navigator.pop(c, 1)),
           ListTile(leading: const Icon(Icons.swap_horiz), title: const Text('Transferencia entre cuentas'), onTap: () => Navigator.pop(c, 2)),
           const _SheetLabel('Previsto (no cambia tu saldo)'),
-          ListTile(leading: const Icon(Icons.schedule, color: FinColors.income), title: const Text('Ingreso previsto'), subtitle: const Text('Una vez o recurrente (ej. \$400 cada sábado)'), onTap: () => Navigator.pop(c, 3)),
-          ListTile(leading: const Icon(Icons.event_busy, color: FinColors.pending), title: const Text('Gasto o pago programado'), subtitle: const Text('Renta, servicios, suscripciones…'), onTap: () => Navigator.pop(c, 4)),
+          ListTile(leading: Icon(Icons.schedule, color: FinColors.of(context).income), title: const Text('Ingreso previsto'), subtitle: const Text('Una vez o recurrente (ej. \$400 cada sábado)'), onTap: () => Navigator.pop(c, 3)),
+          ListTile(leading: Icon(Icons.event_busy, color: FinColors.of(context).pending), title: const Text('Gasto o pago programado'), subtitle: const Text('Renta, servicios, suscripciones…'), onTap: () => Navigator.pop(c, 4)),
         ]),
       ),
     ),

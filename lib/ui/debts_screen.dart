@@ -21,7 +21,7 @@ class DebtsScreen extends StatelessWidget {
         child: ListTile(
           title: const Text('Total pendiente de deudas activas'),
           trailing: Text(formatMoney(l.totalPendingDebt),
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: FinColors.expense)),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: FinColors.of(context).expense)),
         ),
       ),
       if (l.debts.isEmpty)
@@ -56,7 +56,7 @@ class _DebtCard extends StatelessWidget {
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
               Expanded(child: Text(d.name, style: Theme.of(context).textTheme.titleMedium)),
-              StatusChip(d.status.label, d.status == DebtStatus.active ? FinColors.pending : FinColors.neutral),
+              StatusChip(d.status.label, d.status == DebtStatus.active ? FinColors.of(context).pending : FinColors.of(context).neutral),
             ]),
             const SizedBox(height: 8),
             LinearProgressIndicator(value: progress, minHeight: 6, borderRadius: BorderRadius.circular(4)),
@@ -114,8 +114,8 @@ class DebtDetailScreen extends StatelessWidget {
             padding: const EdgeInsets.all(16),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               _kv('Monto original', formatMoney(s.original)),
-              _kv('Total pagado', formatMoney(s.paid), color: FinColors.income),
-              _kv('Saldo pendiente', formatMoney(s.remaining), color: FinColors.expense, bold: true),
+              _kv('Total pagado', formatMoney(s.paid), color: FinColors.of(context).income),
+              _kv('Saldo pendiente', formatMoney(s.remaining), color: FinColors.of(context).expense, bold: true),
               const Divider(),
               _kv('Suma de cuotas pendientes', formatMoney(s.pendingInstallments)),
               _kv('Inicio', fmtDate(d.startDate)),
@@ -199,7 +199,7 @@ class _InstallmentTile extends StatelessWidget {
                 Text(fmtDate(inst.dueDate), style: Theme.of(context).textTheme.bodySmall),
               ]),
             ),
-            StatusChip(status.label, installmentColor(status)),
+            StatusChip(status.label, installmentColor(context, status)),
             PopupMenuButton<String>(
               onSelected: (v) async {
                 switch (v) {
@@ -234,7 +234,7 @@ class _InstallmentTile extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(left: 40, top: 2),
               child: Text('✓ ${formatMoney(p.amount)} el ${fmtDate(p.date)} desde ${l.account(p.accountId).name}',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: FinColors.income)),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: FinColors.of(context).income)),
             ),
           if (open)
             Align(

@@ -31,7 +31,7 @@ class RecurrencesScreen extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(top: 8),
             child: Text('Ingreso recurrente estimado: ${formatMoney(monthlyIncome)} al mes',
-                style: const TextStyle(fontWeight: FontWeight.w600, color: FinColors.income)),
+                style: TextStyle(fontWeight: FontWeight.w600, color: FinColors.of(context).income)),
           ),
         const SectionTitle('Ingresos'),
         if (incomes.isEmpty) const Text('Sin ingresos recurrentes. Ejemplo: \$400 cada sábado.'),
@@ -60,7 +60,7 @@ class _RecurrenceTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = AppScope.of(context).ledger;
-    final color = !r.active ? FinColors.neutral : (r.isIncome ? FinColors.income : FinColors.pending);
+    final color = !r.active ? FinColors.of(context).neutral : (r.isIncome ? FinColors.of(context).income : FinColors.of(context).pending);
     final next = r.occurrences(l.today, l.today.add(const Duration(days: 400)));
     return Card(
       child: ListTile(

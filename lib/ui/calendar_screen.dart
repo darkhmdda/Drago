@@ -62,12 +62,12 @@ class _Legend extends StatelessWidget {
   const _Legend();
   @override
   Widget build(BuildContext context) {
-    const items = [
-      (FinColors.income, 'Ingreso'),
-      (FinColors.pending, 'Pago pendiente'),
-      (FinColors.expense, 'Vencido'),
-      (FinColors.paid, 'Pagado'),
-      (FinColors.neutral, 'No recibido / cancelado'),
+    final items = [
+      (FinColors.of(context).income, 'Ingreso'),
+      (FinColors.of(context).pending, 'Pago pendiente'),
+      (FinColors.of(context).expense, 'Vencido'),
+      (FinColors.of(context).paid, 'Pagado'),
+      (FinColors.of(context).neutral, 'No recibido / cancelado'),
     ];
     return Wrap(spacing: 12, runSpacing: 4, children: [
       for (final (c, t) in items)
@@ -90,7 +90,7 @@ class EventTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final e = event;
-    final color = eventColor(e);
+    final color = eventColor(context, e);
     final strike = e.skipped ? TextDecoration.lineThrough : null;
     return Card(
       child: ListTile(
@@ -191,9 +191,9 @@ class _MonthView extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: Wrap(spacing: 24, runSpacing: 8, children: [
-            _Stat('Ingresos del mes', formatMoney(incomes), FinColors.income),
-            _Stat('Pagos y gastos del mes', formatMoney(payments), FinColors.pending),
-            _Stat('Falta pagar', formatMoney(pendingPayments), FinColors.expense),
+            _Stat('Ingresos del mes', formatMoney(incomes), FinColors.of(context).income),
+            _Stat('Pagos y gastos del mes', formatMoney(payments), FinColors.of(context).pending),
+            _Stat('Falta pagar', formatMoney(pendingPayments), FinColors.of(context).expense),
           ]),
         ),
       ),
@@ -266,14 +266,14 @@ class _DayCell extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                     fontSize: 10.5,
-                    color: eventColor(e),
+                    color: eventColor(context, e),
                     fontWeight: FontWeight.w600,
                     decoration: e.skipped ? TextDecoration.lineThrough : null),
               )
           else
             Wrap(spacing: 2, runSpacing: 2, alignment: WrapAlignment.center, children: [
               for (final e in events.take(4))
-                Container(width: 6, height: 6, decoration: BoxDecoration(color: eventColor(e), shape: BoxShape.circle)),
+                Container(width: 6, height: 6, decoration: BoxDecoration(color: eventColor(context, e), shape: BoxShape.circle)),
             ]),
           if (roomy && events.length > 3) Text('+${events.length - 3} más', style: const TextStyle(fontSize: 10)),
         ]),
@@ -312,7 +312,7 @@ class _WeekView extends StatelessWidget {
         TextButton(onPressed: () => onMove(today), child: const Text('Hoy')),
       ]),
       Text('Balance previsto de la semana: ${formatMoney(net, signed: true)}',
-          textAlign: TextAlign.center, style: TextStyle(color: amountColor(net), fontWeight: FontWeight.w600)),
+          textAlign: TextAlign.center, style: TextStyle(color: amountColor(context, net), fontWeight: FontWeight.w600)),
       for (var k = 0; k < 7; k++)
         () {
           final day = start.add(Duration(days: k));

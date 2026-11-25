@@ -36,6 +36,7 @@ La especificación completa está en [`docs/especificacion.md`](docs/especificac
   - La agenda muestra el **saldo proyectado** después de cada evento; los ingresos atrasados no se suman hasta confirmarse.
 - **Cuenta y sincronización** (opcional): inicio de sesión con correo; los datos se guardan primero en el dispositivo
   y se sincronizan con Supabase; si dos dispositivos cambian a la vez, la app pregunta qué copia conservar.
+- **Temas**: Clásico, Clásico oscuro, Ryusui y Nami (Ajustes → Apariencia), con colores de ingresos, gastos y pendientes adaptados a cada uno.
 - **Ajustes**: gestión de cuentas, respaldo/restauración (JSON) e historial de cambios (auditoría).
 - Dinero siempre en **centavos enteros**; operaciones **atómicas**.
 

@@ -7,6 +7,7 @@ import '../domain/models.dart';
 import '../domain/money.dart';
 import 'common.dart';
 import 'sync_widgets.dart';
+import 'themes.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -42,6 +43,8 @@ class SettingsScreen extends StatelessWidget {
             ),
           ),
         ),
+      const SectionTitle('Apariencia'),
+      const _ThemePicker(),
       const SectionTitle('Respaldo'),
       Card(
         child: Column(children: [
@@ -154,5 +157,98 @@ class SettingsScreen extends StatelessWidget {
     } on FinanceException catch (e) {
       if (context.mounted) showMessage(context, e.message, error: true);
     }
+  }
+}
+
+class _ThemePicker extends StatelessWidget {
+  const _ThemePicker();
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = ThemeScope.of(context);
+    return LayoutBuilder(builder: (context, c) {
+      final cols = c.maxWidth >= 600 ? 2 : 1;
+      final w = (c.maxWidth - (cols - 1) * 8) / cols;
+      return Wrap(spacing: 8, runSpacing: 8, children: [
+        for (final t in AppTheme.values)
+          SizedBox(width: w, child: _ThemeCard(theme: t, selected: controller.theme == t, onTap: () => controller.set(t))),
+      ]);
+    });
+  }
+}
+
+class _ThemeCard extends StatelessWidget {
+  final AppTheme theme;
+  final bool selected;
+  final VoidCallback onTap;
+  const _ThemeCard({required this.theme, required this.selected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    // Vista previa con los colores reales de ese tema.
+    final preview = theme.data;
+    final fin = preview.extension<FinPalette>()!;
+    final btnStyle = preview.filledButtonTheme.style;
+    final btnBg = btnStyle?.backgroundColor?.resolve({}) ?? preview.colorScheme.primary;
+    final btnFg = btnStyle?.foregroundColor?.resolve({}) ?? preview.colorScheme.onPrimary;
+    return Card(
+      margin: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: selected ? scheme.primary : scheme.outlineVariant, width: selected ? 2 : 1),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Icon(selected ? Icons.radio_button_checked : Icons.radio_button_unchecked, color: selected ? scheme.primary : null),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(theme.label, style: const TextStyle(fontWeight: FontWeight.w700)),
+                  Text(theme.description, style: Theme.of(context).textTheme.bodySmall),
+                ]),
+              ),
+            ]),
+            const SizedBox(height: 10),
+            // Mini maqueta: fondo, tarjeta principal y montos.
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(color: preview.colorScheme.surface, borderRadius: BorderRadius.circular(8)),
+              child: Row(children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  decoration: BoxDecoration(color: preview.colorScheme.primaryContainer, borderRadius: BorderRadius.circular(6)),
+                  child: Text('\$650', style: TextStyle(color: preview.colorScheme.onPrimaryContainer, fontWeight: FontWeight.w800)),
+                ),
+                const SizedBox(width: 8),
+                Text('+\$400 ', style: TextStyle(color: fin.income, fontWeight: FontWeight.w700, fontSize: 12)),
+                Text('-\$750', style: TextStyle(color: fin.pending, fontWeight: FontWeight.w700, fontSize: 12)),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(color: btnBg, borderRadius: BorderRadius.circular(20)),
+                  child: Text('Pagar', style: TextStyle(color: btnFg, fontSize: 12, fontWeight: FontWeight.w600)),
+                ),
+              ]),
+            ),
+            const SizedBox(height: 8),
+            Row(children: [
+              for (final c in theme.swatch)
+                Container(
+                  width: 18,
+                  height: 18,
+                  margin: const EdgeInsets.only(right: 4),
+                  decoration: BoxDecoration(color: c, shape: BoxShape.circle, border: Border.all(color: scheme.outlineVariant)),
+                ),
+            ]),
+          ]),
+        ),
+      ),
+    );
   }
 }

@@ -40,7 +40,7 @@ class SyncIndicator extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final color = switch (s.status) {
       SyncStatus.conflict || SyncStatus.offline => scheme.error,
-      SyncStatus.idle => FinColors.income,
+      SyncStatus.idle => FinColors.of(context).income,
       _ => null,
     };
     return IconButton(tooltip: text, icon: Icon(icon, color: color), onPressed: onTap);

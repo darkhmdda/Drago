@@ -6,22 +6,22 @@ import '../data/app_state.dart';
 import '../domain/ledger.dart';
 import '../domain/models.dart';
 import '../domain/money.dart';
+import 'themes.dart';
 
 final _dateFmt = DateFormat('d MMM y', 'es_MX');
 final _shortDateFmt = DateFormat('EEE d MMM', 'es_MX');
 String fmtDate(DateTime d) => _dateFmt.format(d);
 String fmtShortDate(DateTime d) => _shortDateFmt.format(d);
 
-/// Colores semánticos usados en toda la app.
+/// Colores con significado financiero del tema activo.
 class FinColors {
-  static const income = Color(0xFF1B8A5A);
-  static const expense = Color(0xFFC0392B);
-  static const pending = Color(0xFFD68910);
-  static const neutral = Color(0xFF5D6D7E);
-  static const paid = Color(0xFF2E6DA4);
+  static FinPalette of(BuildContext context) => Theme.of(context).extension<FinPalette>()!;
 }
 
-Color amountColor(Cents c) => c > 0 ? FinColors.income : (c < 0 ? FinColors.expense : FinColors.neutral);
+Color amountColor(BuildContext context, Cents c) {
+  final f = FinColors.of(context);
+  return c > 0 ? f.income : (c < 0 ? f.expense : f.neutral);
+}
 
 void showMessage(BuildContext context, String msg, {bool error = false}) {
   ScaffoldMessenger.of(context)
@@ -176,12 +176,12 @@ class StatusChip extends StatelessWidget {
       );
 }
 
-Color installmentColor(InstallmentStatus s) => switch (s) {
-      InstallmentStatus.paid => FinColors.income,
-      InstallmentStatus.overdue => FinColors.expense,
-      InstallmentStatus.partial => FinColors.pending,
-      InstallmentStatus.pending => FinColors.pending,
-      InstallmentStatus.cancelled => FinColors.neutral,
+Color installmentColor(BuildContext context, InstallmentStatus s) => switch (s) {
+      InstallmentStatus.paid => FinColors.of(context).income,
+      InstallmentStatus.overdue => FinColors.of(context).expense,
+      InstallmentStatus.partial => FinColors.of(context).pending,
+      InstallmentStatus.pending => FinColors.of(context).pending,
+      InstallmentStatus.cancelled => FinColors.of(context).neutral,
     };
 
 /// Contenedor con ancho máximo para pantallas grandes (web).
