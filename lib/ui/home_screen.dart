@@ -5,12 +5,13 @@ import '../data/app_state.dart';
 import '../domain/models.dart';
 import '../domain/money.dart';
 import 'common.dart';
+import 'calendar_screen.dart';
 import 'dialogs.dart';
 
 class HomeScreen extends StatelessWidget {
   final VoidCallback onOpenDebts;
-  final VoidCallback onOpenAgenda;
-  const HomeScreen({super.key, required this.onOpenDebts, required this.onOpenAgenda});
+  final VoidCallback onOpenCalendar;
+  const HomeScreen({super.key, required this.onOpenDebts, required this.onOpenCalendar});
 
   @override
   Widget build(BuildContext context) {
@@ -20,6 +21,7 @@ class HomeScreen extends StatelessWidget {
     final next = l.nextPayment;
     final nextIncome = l.nextIncome;
     final alerts = l.alerts;
+    final upcoming = l.upcomingPayments(limit: 5);
     final theme = Theme.of(context);
 
     return PageBody(children: [
@@ -63,14 +65,14 @@ class HomeScreen extends StatelessWidget {
           value: next == null ? 'Sin pagos' : formatMoney(l.remainingForInstallment(next.id)),
           sub: next == null ? null : '${l.debt(next.debtId).name} · ${fmtShortDate(next.dueDate)}',
           color: FinColors.expense,
-          onTap: onOpenAgenda,
+          onTap: onOpenCalendar,
         ),
         _Tile(
           label: 'Próximo ingreso',
           value: nextIncome == null ? 'Sin previstos' : formatMoney(nextIncome.amount),
-          sub: nextIncome == null ? null : '${nextIncome.description} · ${fmtShortDate(nextIncome.date)} (previsto)',
+          sub: nextIncome == null ? null : '${nextIncome.title} · ${fmtShortDate(nextIncome.date)} (previsto)',
           color: FinColors.income,
-          onTap: onOpenAgenda,
+          onTap: onOpenCalendar,
         ),
         _Tile(
           label: 'Deudas pendientes',
@@ -84,9 +86,14 @@ class HomeScreen extends StatelessWidget {
           value: formatMoney(l.scheduledPaymentsInMonth(now)),
           sub: 'Falta pagar ${formatMoney(l.pendingPaymentsInMonth(now))}',
           color: FinColors.pending,
-          onTap: onOpenAgenda,
+          onTap: onOpenCalendar,
         ),
       ]),
+      SectionTitle('Próximos pagos',
+          trailing: TextButton(onPressed: onOpenCalendar, child: const Text('Ver calendario'))),
+      if (upcoming.isEmpty)
+        const Padding(padding: EdgeInsets.all(8), child: Text('No tienes pagos pendientes en los próximos 60 días.')),
+      for (final e in upcoming) EventTile(event: e),
       const SectionTitle('Este mes'),
       Card(
         child: Padding(

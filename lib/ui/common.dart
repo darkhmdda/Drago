@@ -18,6 +18,7 @@ class FinColors {
   static const expense = Color(0xFFC0392B);
   static const pending = Color(0xFFD68910);
   static const neutral = Color(0xFF5D6D7E);
+  static const paid = Color(0xFF2E6DA4);
 }
 
 Color amountColor(Cents c) => c > 0 ? FinColors.income : (c < 0 ? FinColors.expense : FinColors.neutral);

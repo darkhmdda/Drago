@@ -1,6 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 
-import 'agenda_screen.dart';
+import 'calendar_screen.dart';
 import 'debts_screen.dart';
 import 'dialogs.dart';
 import 'home_screen.dart';
@@ -16,11 +16,11 @@ class AppShell extends StatefulWidget {
 class _AppShellState extends State<AppShell> {
   int _index = 0;
 
-  static const _titles = ['Inicio', 'Deudas y pagos', 'Agenda', 'Movimientos', 'Configuración'];
+  static const _titles = ['Inicio', 'Deudas y pagos', 'Calendario financiero', 'Movimientos', 'Configuración'];
   static const _destinations = [
     (Icons.home_outlined, Icons.home, 'Inicio'),
     (Icons.credit_card_outlined, Icons.credit_card, 'Deudas'),
-    (Icons.event_note_outlined, Icons.event_note, 'Agenda'),
+    (Icons.calendar_month_outlined, Icons.calendar_month, 'Calendario'),
     (Icons.receipt_long_outlined, Icons.receipt_long, 'Movimientos'),
     (Icons.settings_outlined, Icons.settings, 'Ajustes'),
   ];
@@ -29,9 +29,9 @@ class _AppShellState extends State<AppShell> {
   Widget build(BuildContext context) {
     final wide = MediaQuery.sizeOf(context).width >= 800;
     final pages = [
-      HomeScreen(onOpenDebts: () => setState(() => _index = 1), onOpenAgenda: () => setState(() => _index = 2)),
+      HomeScreen(onOpenDebts: () => setState(() => _index = 1), onOpenCalendar: () => setState(() => _index = 2)),
       const DebtsScreen(),
-      const AgendaScreen(),
+      const CalendarScreen(),
       const MovementsScreen(),
       const SettingsScreen(),
     ];

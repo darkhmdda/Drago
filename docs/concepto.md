@@ -4,9 +4,9 @@ Yo lo desarrollaría pensando en que sustituya progresivamente este seguimiento 
 
 # **1. Concepto del proyecto**
 
-# **FinanSync**
+# **Drago**
 
-Nombre provisional · Asistente de organización financiera personal
+Asistente de organización financiera personal
 
 [AI Finance/Expenses Management Appdesign by Mansoor Gull ⚚ on Dribbble](https://images.openai.com/static-rsc-4/MJsvZx9reviK_zRBNXZJo-Z4yw_QSWqrGnuUqtXrOOvchNFkXevfNJm_iTQ7eImH--AubuXv2poySWtjEed8CIYH4UHEhn6VIZiur709TXNem__Sb8GgDcOUMzsHhYJE6eruQY8dopzBJmhrZ6HUpfqDFJUjZJ_lOx7rEEjfRA0?purpose=inline)
 
@@ -30,7 +30,7 @@ No haría una interfaz llena de formularios y gráficas innecesarias. La organiz
 
 Concepto de interfaz
 
-## **FinanSync**
+## **Drago**
 
 DINERO DISPONIBLE · HOY
 
@@ -216,7 +216,7 @@ Esto es especialmente importante porque ya hemos trabajado de esta manera.
 
 Actualmente me compartes capturas de DiDi, Mercado Pago y Coppel para actualizar sus cuotas.
 
-En FinanSync habría una función llamada **Importar estado de cuenta**.
+En Drago habría una función llamada **Importar estado de cuenta**.
 
 [💳 Smart Expense Tracker – Dark Mode UI by Viktoriia Muznik on Dribbble](https://images.openai.com/static-rsc-4/5l5G1zMda_7C2V5FG20oXmnmLIzi_et6j-KhocT91jt0BQlkhzand7zBGZfSpIXDQCfR-oY-OlcSCM4nYhMdAvMxvo7LUJPVmSQfDNEUOc6EJ1BOtePz4MMP5K3MvVQRKbUq1I_BMll6wiRoHt5STVl43VhLrIzl9-Wg3uesATs?purpose=inline)
 
@@ -327,7 +327,7 @@ No intentaría construir todas las funciones desde el principio. Lo dividiría e
 
 Fase 1
 
-**FinanSync Core**
+**Drago Core**
 
 - Registro de cuentas.
 - Saldo físico y digital.
@@ -348,7 +348,7 @@ Fase 2
 
 Fase 3
 
-**FinanSync Assistant**
+**Drago Assistant**
 
 - Chat financiero.
 - Interpretación de lenguaje natural.
@@ -385,4 +385,4 @@ La aplicación no necesitaría conectarse directamente a tus bancos para funcion
 
 Yo lo construiría como un proyecto propio, con identidad visual, nombre, arquitectura y versiones bien definidas.
 
-Y hay una decisión que tomaría desde el inicio: **FinanSync debe poder funcionar perfectamente sin inteligencia artificial**. El asistente sería una capa adicional, nunca una dependencia para consultar tu saldo, calcular tus pagos o recuperar tus datos.
+Y hay una decisión que tomaría desde el inicio: **Drago debe poder funcionar perfectamente sin inteligencia artificial**. El asistente sería una capa adicional, nunca una dependencia para consultar tu saldo, calcular tus pagos o recuperar tus datos.

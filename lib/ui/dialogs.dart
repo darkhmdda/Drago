@@ -4,11 +4,12 @@ import '../data/app_state.dart';
 import '../domain/models.dart';
 import '../domain/money.dart';
 import 'common.dart';
+import 'scheduled_dialogs.dart';
 
 const expenseCategories = ['Comida', 'Transporte', 'Servicios', 'Hogar', 'Salud', 'Entretenimiento', 'Compras', 'Otros'];
 const incomeCategories = ['Trabajo', 'Ventas', 'Préstamo recibido', 'Regalo', 'Otros'];
 
-String? _defaultAccount(BuildContext context, AccountKind kind) {
+String? defaultAccount(BuildContext context, AccountKind kind) {
   final accs = AppScope.of(context).ledger.activeAccounts;
   final match = accs.where((a) => a.kind == kind);
   return match.isNotEmpty ? match.first.id : (accs.isNotEmpty ? accs.first.id : null);
@@ -20,7 +21,7 @@ Future<void> showIncomeExpenseDialog(BuildContext context, {required bool income
   final amount = TextEditingController();
   final desc = TextEditingController();
   var date = DateTime.now();
-  var account = _defaultAccount(context, AccountKind.physical);
+  var account = defaultAccount(context, AccountKind.physical);
   String? category;
   final cats = income ? incomeCategories : expenseCategories;
 
@@ -62,8 +63,8 @@ Future<void> showTransferDialog(BuildContext context) async {
   final amount = TextEditingController();
   final desc = TextEditingController();
   var date = DateTime.now();
-  String? from = _defaultAccount(context, AccountKind.physical);
-  String? to = _defaultAccount(context, AccountKind.digital);
+  String? from = defaultAccount(context, AccountKind.physical);
+  String? to = defaultAccount(context, AccountKind.digital);
   if (to == from) to = null;
 
   final ok = await showFormDialog<bool>(
@@ -127,67 +128,6 @@ Future<void> showSetBalanceDialog(BuildContext context, Account account) async {
       success: 'Saldo actualizado');
 }
 
-Future<void> showScheduledIncomeDialog(BuildContext context) async {
-  final formKey = GlobalKey<FormState>();
-  final amount = TextEditingController();
-  final desc = TextEditingController();
-  var date = DateTime.now().add(const Duration(days: 1));
-  var account = _defaultAccount(context, AccountKind.physical);
-
-  final ok = await showFormDialog<bool>(
-    context,
-    title: 'Ingreso previsto',
-    formKey: formKey,
-    onSubmit: () => true,
-    builder: (c, setState) => Column(mainAxisSize: MainAxisSize.min, children: [
-      const Text('Un ingreso previsto NO aumenta tu saldo real hasta que confirmes que lo recibiste.',
-          style: TextStyle(fontSize: 13)),
-      gap,
-      MoneyField(controller: amount, autofocus: true),
-      gap,
-      TextFormField(controller: desc, decoration: const InputDecoration(labelText: 'Descripción', hintText: 'Ingreso semanal', border: OutlineInputBorder())),
-      gap,
-      AccountDropdown(label: 'Cuenta donde lo recibirás', value: account, onChanged: (v) => setState(() => account = v)),
-      gap,
-      DateField(label: 'Fecha esperada', value: date, onChanged: (d) => setState(() => date = d)),
-    ]),
-  );
-  if (ok != true || !context.mounted) return;
-  final cents = parseMoney(amount.text)!;
-  await runOp(context,
-      (l) => l.addScheduledIncome(accountId: account!, amount: cents, date: date, description: desc.text),
-      success: 'Ingreso previsto agregado');
-}
-
-Future<void> showConfirmIncomeDialog(BuildContext context, ScheduledIncome s) async {
-  final formKey = GlobalKey<FormState>();
-  final amount = TextEditingController(text: centsToInput(s.amount));
-  var date = DateTime.now();
-  String? account = s.accountId;
-
-  final ok = await showFormDialog<bool>(
-    context,
-    title: 'Confirmar ingreso recibido',
-    action: 'Confirmar',
-    formKey: formKey,
-    onSubmit: () => true,
-    builder: (c, setState) => Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text('${s.description} · previsto para ${fmtDate(s.date)}'),
-      gap,
-      MoneyField(controller: amount, label: 'Importe recibido'),
-      gap,
-      AccountDropdown(value: account, onChanged: (v) => setState(() => account = v)),
-      gap,
-      DateField(label: 'Fecha en que se recibió', value: date, onChanged: (d) => setState(() => date = d)),
-    ]),
-  );
-  if (ok != true || !context.mounted) return;
-  final cents = parseMoney(amount.text)!;
-  await runOp(context,
-      (l) => l.confirmScheduledIncome(s.id, actualAmount: cents, date: date, accountId: account),
-      success: 'Ingreso recibido: ${formatMoney(cents)}');
-}
-
 /// Flujo del botón de pago de una cuota (sección 2.2):
 /// identifica la cuota, muestra importe y fecha, pregunta la cuenta y la fecha
 /// real, permite abono parcial y pide confirmación antes de registrar.
@@ -199,7 +139,7 @@ Future<void> showPayInstallmentDialog(BuildContext context, Installment inst) as
   final formKey = GlobalKey<FormState>();
   final amount = TextEditingController(text: centsToInput(remaining));
   var date = DateTime.now();
-  var account = _defaultAccount(context, AccountKind.physical);
+  var account = defaultAccount(context, AccountKind.physical);
 
   final ok = await showFormDialog<bool>(
     context,
@@ -281,18 +221,23 @@ Future<void> showAddInstallmentDialog(BuildContext context, String debtId) async
   await runOp(context, (l) => l.addInstallment(debtId, amount: cents, dueDate: date), success: 'Cuota agregada');
 }
 
-/// Menú de acciones rápidas (ingreso, gasto, transferencia, ingreso previsto).
+/// Menú de acciones rápidas.
 Future<void> showQuickActions(BuildContext context) async {
   final choice = await showModalBottomSheet<int>(
     context: context,
     showDragHandle: true,
     builder: (c) => SafeArea(
-      child: Column(mainAxisSize: MainAxisSize.min, children: [
-        ListTile(leading: const Icon(Icons.remove_circle_outline, color: FinColors.expense), title: const Text('Gasto'), onTap: () => Navigator.pop(c, 0)),
-        ListTile(leading: const Icon(Icons.add_circle_outline, color: FinColors.income), title: const Text('Ingreso recibido'), onTap: () => Navigator.pop(c, 1)),
-        ListTile(leading: const Icon(Icons.swap_horiz), title: const Text('Transferencia entre cuentas'), onTap: () => Navigator.pop(c, 2)),
-        ListTile(leading: const Icon(Icons.schedule, color: FinColors.pending), title: const Text('Ingreso previsto'), onTap: () => Navigator.pop(c, 3)),
-      ]),
+      child: SingleChildScrollView(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const _SheetLabel('Dinero real'),
+          ListTile(leading: const Icon(Icons.remove_circle_outline, color: FinColors.expense), title: const Text('Gasto'), onTap: () => Navigator.pop(c, 0)),
+          ListTile(leading: const Icon(Icons.add_circle_outline, color: FinColors.income), title: const Text('Ingreso recibido'), onTap: () => Navigator.pop(c, 1)),
+          ListTile(leading: const Icon(Icons.swap_horiz), title: const Text('Transferencia entre cuentas'), onTap: () => Navigator.pop(c, 2)),
+          const _SheetLabel('Previsto (no cambia tu saldo)'),
+          ListTile(leading: const Icon(Icons.schedule, color: FinColors.income), title: const Text('Ingreso previsto'), subtitle: const Text('Una vez o recurrente (ej. \$400 cada sábado)'), onTap: () => Navigator.pop(c, 3)),
+          ListTile(leading: const Icon(Icons.event_busy, color: FinColors.pending), title: const Text('Gasto o pago programado'), subtitle: const Text('Renta, servicios, suscripciones…'), onTap: () => Navigator.pop(c, 4)),
+        ]),
+      ),
     ),
   );
   if (!context.mounted || choice == null) return;
@@ -304,6 +249,18 @@ Future<void> showQuickActions(BuildContext context) async {
     case 2:
       await showTransferDialog(context);
     case 3:
-      await showScheduledIncomeDialog(context);
+      await showScheduledForm(context, isIncome: true);
+    case 4:
+      await showScheduledForm(context, isIncome: false);
   }
+}
+
+class _SheetLabel extends StatelessWidget {
+  final String text;
+  const _SheetLabel(this.text);
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+        child: Align(alignment: Alignment.centerLeft, child: Text(text, style: Theme.of(context).textTheme.labelLarge)),
+      );
 }

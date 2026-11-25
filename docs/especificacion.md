@@ -1,16 +1,13 @@
-> **Nota sobre el nombre del proyecto:**  
-> El nombre actual, **FinanSync**, es completamente provisional y se utiliza únicamente como identificador temporal durante la etapa de planificación y desarrollo. No representa el nombre definitivo de la aplicación. El nombre oficial se decidirá más adelante, cuando se encuentre una opción que represente mejor la identidad, propósito y personalidad del programa.
->
-> Por lo tanto, todas las referencias a "FinanSync" dentro de este documento deben interpretarse como referencias al proyecto, no como una decisión definitiva de marca o identidad comercial y acepto propuestas para otro nombre del proyecto.
+> **Nombre del proyecto:** **Drago** (definido el 25/11/2026). Durante la planificación se usó el nombre provisional «FinanSync».
 
-FinanSync
+Drago
 Especificación funcional y técnica del proyecto
 
 Documento base · Versión 1.0 · 25 de noviembre de 2026
 
-FINANSYNC
+DRAGO
 1. Descripción general
-FinanSync será una aplicación de administración financiera personal, disponible en dos plataformas:
+Drago será una aplicación de administración financiera personal, disponible en dos plataformas:
 - Aplicación web para computadora.
 - Aplicación Android mediante APK.
 Su propósito será permitir al usuario administrar su dinero, controlar deudas, organizar pagos, registrar ingresos, visualizar calendarios financieros y recibir notificaciones sobre compromisos económicos.
@@ -544,7 +541,7 @@ Permitir descargar un respaldo de toda la información para evitar perder el his
 F. Edición controlada
 Si una cuota cambia, mostrar el importe anterior y el nuevo antes de guardar.
 18. Conclusión
-FinanSync debe ser una herramienta de administración financiera personal, no solamente una calculadora de gastos.
+Drago debe ser una herramienta de administración financiera personal, no solamente una calculadora de gastos.
 
 Su mayor valor será centralizar la información que actualmente organizamos mediante conversaciones:
 - Saldos.

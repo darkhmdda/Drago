@@ -64,12 +64,11 @@ create table recurrences (
   description   text not null,
   amount_cents  bigint not null check (amount_cents > 0),
   account_id    uuid not null references accounts,
+  is_income     boolean not null default true,
   frequency     recurrence_freq not null,
-  interval_days int check (interval_days > 0),          -- solo para 'custom'
-  weekday       int check (weekday between 1 and 7),    -- semanal
-  day_of_month  int check (day_of_month between 1 and 31),
-  starts_on     date not null,
-  ends_on       date,
+  interval_days int not null default 7 check (interval_days > 0),  -- solo para 'custom'
+  starts_on     date not null,   -- define el día de la semana / del mes
+  ends_on       date check (ends_on is null or ends_on >= starts_on),
   active        boolean not null default true
 );
 
@@ -83,7 +82,10 @@ create table scheduled_items (
   amount_cents   bigint not null check (amount_cents > 0),
   description    text not null,
   account_id     uuid not null references accounts,
-  status         scheduled_status not null default 'expected'
+  status         scheduled_status not null default 'expected',
+  -- Ocurrencia de una regla recurrente que el usuario confirmó o ajustó.
+  occurrence_date date,
+  unique (recurrence_id, occurrence_date)   -- una ocurrencia nunca se duplica
 );
 
 -- Movimientos reales. amount_cents > 0 salvo en ajustes (con signo).
@@ -253,3 +255,18 @@ begin
   values ('Pago de cuota', v_debt.name || ' #' || v_inst.number || ': ' || v_amount || ' centavos');
   return v_tx;
 end $$;
+
+-- ---------------------------------------------------------------------------
+-- Permisos explícitos: el proyecto se crea SIN conceder acceso automático a
+-- tablas nuevas. Solo usuarios autenticados (y siempre filtrados por RLS).
+-- El rol anónimo no recibe ningún permiso.
+-- ---------------------------------------------------------------------------
+grant usage on schema public to authenticated;
+grant select, insert, update, delete on
+  accounts, categories, debts, installments, recurrences, scheduled_items,
+  transactions, installment_payments, projections, projection_events,
+  notifications, attachments to authenticated;
+grant select, insert on audit_logs to authenticated;
+grant select on account_balances to authenticated;
+grant execute on function pay_installment(uuid, uuid, date, bigint) to authenticated;
+revoke execute on function pay_installment(uuid, uuid, date, bigint) from public, anon;

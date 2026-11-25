@@ -14,8 +14,14 @@ void main() {
   l.setBalance(accountId: cash, newBalance: 50000, note: 'Saldo inicial');
   l.setBalance(accountId: bank, newBalance: 15000, note: 'Saldo inicial');
   l.addExpense(accountId: cash, amount: 8000, date: t, description: 'Comida', category: 'Comida');
-  l.addScheduledIncome(accountId: cash, amount: 40000, date: t.add(const Duration(days: 3)), description: 'Ingreso semanal');
-  l.addScheduledIncome(accountId: cash, amount: 40000, date: t.add(const Duration(days: 10)), description: 'Ingreso semanal');
+  // Ingreso semanal de $400 cada sábado y $100 adicionales los martes.
+  final sat = t.add(Duration(days: (DateTime.saturday - t.weekday) % 7));
+  final tue = t.add(Duration(days: (DateTime.tuesday - t.weekday) % 7));
+  l.addRecurrence(description: 'Ingreso semanal', amount: 40000, accountId: cash, frequency: Frequency.weekly, startDate: sat);
+  l.addRecurrence(description: 'Ingreso adicional', amount: 10000, accountId: cash, frequency: Frequency.weekly, startDate: tue);
+  l.addRecurrence(
+      description: 'Internet', amount: 39900, accountId: bank, frequency: Frequency.monthly,
+      startDate: DateTime(t.year, t.month, 10), isIncome: false);
   l.addDebt(name: 'DiDi Préstamos', total: 650000, startDate: t, installments: [
     (amount: 75000, dueDate: DateTime(t.year, t.month, t.day + 6)),
     (amount: 64200, dueDate: DateTime(t.year, t.month, t.day + 21)),

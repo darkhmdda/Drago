@@ -260,50 +260,72 @@ class Installment {
 }
 
 // ---------------------------------------------------------------------------
-// Ingresos previstos
+// Ingresos y gastos previstos
 // ---------------------------------------------------------------------------
 
 enum ScheduledStatus { expected, received, notReceived }
 
 extension ScheduledStatusLabel on ScheduledStatus {
-  String get label => switch (this) {
+  String labelFor(bool isIncome) => switch (this) {
         ScheduledStatus.expected => 'Previsto',
-        ScheduledStatus.received => 'Recibido',
-        ScheduledStatus.notReceived => 'No recibido',
+        ScheduledStatus.received => isIncome ? 'Recibido' : 'Pagado',
+        ScheduledStatus.notReceived => isIncome ? 'No recibido' : 'Cancelado',
       };
 }
 
-/// Ingreso esperado. NUNCA afecta el saldo real mientras esté previsto.
-class ScheduledIncome {
+/// Ingreso o gasto esperado en una fecha. NUNCA afecta el saldo real
+/// mientras esté previsto; al confirmarse genera un movimiento real.
+///
+/// Si proviene de una regla recurrente, [recurrenceId] + [occurrenceDate]
+/// identifican la ocurrencia, de modo que nunca se duplique.
+class ScheduledItem {
   final String id;
   final DateTime date;
   final Cents amount;
   final String description;
   final String accountId;
+  final bool isIncome;
   final ScheduledStatus status;
 
-  /// Movimiento real creado al confirmar la recepción.
+  /// Movimiento real creado al confirmar.
   final String? transactionId;
+  final String? recurrenceId;
+  final DateTime? occurrenceDate;
 
-  const ScheduledIncome({
+  const ScheduledItem({
     required this.id,
     required this.date,
     required this.amount,
     required this.description,
     required this.accountId,
+    this.isIncome = true,
     this.status = ScheduledStatus.expected,
     this.transactionId,
+    this.recurrenceId,
+    this.occurrenceDate,
   });
 
-  ScheduledIncome copyWith({ScheduledStatus? status, String? transactionId, bool clearTransaction = false}) =>
-      ScheduledIncome(
+  ScheduledItem copyWith({
+    DateTime? date,
+    Cents? amount,
+    String? description,
+    String? accountId,
+    ScheduledStatus? status,
+    String? transactionId,
+    bool clearTransaction = false,
+    bool clearRecurrence = false,
+  }) =>
+      ScheduledItem(
         id: id,
-        date: date,
-        amount: amount,
-        description: description,
-        accountId: accountId,
+        date: date ?? this.date,
+        amount: amount ?? this.amount,
+        description: description ?? this.description,
+        accountId: accountId ?? this.accountId,
+        isIncome: isIncome,
         status: status ?? this.status,
         transactionId: clearTransaction ? null : (transactionId ?? this.transactionId),
+        recurrenceId: clearRecurrence ? null : recurrenceId,
+        occurrenceDate: clearRecurrence ? null : occurrenceDate,
       );
 
   Map<String, dynamic> toJson() => {
@@ -312,18 +334,187 @@ class ScheduledIncome {
         'amount': amount,
         'description': description,
         'accountId': accountId,
+        'isIncome': isIncome,
         'status': status.name,
         'transactionId': transactionId,
+        'recurrenceId': recurrenceId,
+        'occurrenceDate': occurrenceDate == null ? null : _d(occurrenceDate!),
       };
 
-  factory ScheduledIncome.fromJson(Map<String, dynamic> j) => ScheduledIncome(
+  factory ScheduledItem.fromJson(Map<String, dynamic> j) => ScheduledItem(
         id: j['id'],
         date: _p(j['date']),
         amount: j['amount'],
         description: j['description'] ?? '',
         accountId: j['accountId'],
+        isIncome: j['isIncome'] ?? true,
         status: ScheduledStatus.values.byName(j['status']),
         transactionId: j['transactionId'],
+        recurrenceId: j['recurrenceId'],
+        occurrenceDate: j['occurrenceDate'] == null ? null : _p(j['occurrenceDate']),
+      );
+}
+
+// ---------------------------------------------------------------------------
+// Reglas recurrentes
+// ---------------------------------------------------------------------------
+
+enum Frequency { daily, weekly, biweekly, monthly, custom }
+
+extension FrequencyLabel on Frequency {
+  String get label => switch (this) {
+        Frequency.daily => 'Diaria',
+        Frequency.weekly => 'Semanal',
+        Frequency.biweekly => 'Quincenal',
+        Frequency.monthly => 'Mensual',
+        Frequency.custom => 'Personalizada',
+      };
+}
+
+int _daysInMonth(int y, int m) => DateTime(y, m + 1, 0).day;
+
+/// Regla de ingreso (o gasto) recurrente, por ejemplo «$400 cada sábado».
+/// Sus ocurrencias se calculan; solo se guardan cuando el usuario actúa
+/// sobre una (confirmarla, marcarla como no recibida o ajustarla).
+class Recurrence {
+  final String id;
+  final String description;
+  final Cents amount;
+  final String accountId;
+  final bool isIncome;
+  final Frequency frequency;
+
+  /// Cada cuántos días (solo [Frequency.custom]).
+  final int intervalDays;
+  final DateTime startDate;
+  final DateTime? endDate;
+  final bool active;
+
+  const Recurrence({
+    required this.id,
+    required this.description,
+    required this.amount,
+    required this.accountId,
+    this.isIncome = true,
+    required this.frequency,
+    this.intervalDays = 7,
+    required this.startDate,
+    this.endDate,
+    this.active = true,
+  });
+
+  Recurrence copyWith({
+    String? description,
+    Cents? amount,
+    String? accountId,
+    Frequency? frequency,
+    int? intervalDays,
+    DateTime? startDate,
+    DateTime? endDate,
+    bool clearEnd = false,
+    bool? active,
+  }) =>
+      Recurrence(
+        id: id,
+        description: description ?? this.description,
+        amount: amount ?? this.amount,
+        accountId: accountId ?? this.accountId,
+        isIncome: isIncome,
+        frequency: frequency ?? this.frequency,
+        intervalDays: intervalDays ?? this.intervalDays,
+        startDate: startDate ?? this.startDate,
+        endDate: clearEnd ? null : (endDate ?? this.endDate),
+        active: active ?? this.active,
+      );
+
+  /// Texto legible: «Cada sábado», «Día 1 y 16 de cada mes», etc.
+  String get scheduleLabel {
+    const days = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'];
+    switch (frequency) {
+      case Frequency.daily:
+        return 'Todos los días';
+      case Frequency.weekly:
+        return 'Cada ${days[startDate.weekday - 1]}';
+      case Frequency.biweekly:
+        final (a, b) = biweeklyDays;
+        return 'Días $a y $b de cada mes';
+      case Frequency.monthly:
+        return 'Día ${startDate.day} de cada mes';
+      case Frequency.custom:
+        return 'Cada $intervalDays días';
+    }
+  }
+
+  /// Días del mes para la frecuencia quincenal (ej. 1 y 16, 15 y 30).
+  (int, int) get biweeklyDays {
+    final d = startDate.day;
+    return d <= 15 ? (d, d + 15) : (d - 15, d);
+  }
+
+  /// Fechas de las ocurrencias entre [from] y [to] (inclusive).
+  List<DateTime> occurrences(DateTime from, DateTime to) {
+    final start = dayOf(startDate);
+    var lo = dayOf(from).isBefore(start) ? start : dayOf(from);
+    var hi = dayOf(to);
+    if (endDate != null && dayOf(endDate!).isBefore(hi)) hi = dayOf(endDate!);
+    if (hi.isBefore(lo)) return const [];
+    final out = <DateTime>[];
+    switch (frequency) {
+      case Frequency.daily:
+      case Frequency.weekly:
+      case Frequency.custom:
+        final step = switch (frequency) { Frequency.daily => 1, Frequency.weekly => 7, _ => intervalDays < 1 ? 1 : intervalDays };
+        final offset = lo.difference(start).inDays;
+        var k = (offset + step - 1) ~/ step;
+        while (true) {
+          final d = DateTime(start.year, start.month, start.day + k * step);
+          if (d.isAfter(hi)) break;
+          out.add(d);
+          k++;
+        }
+      case Frequency.monthly:
+      case Frequency.biweekly:
+        final wanted = frequency == Frequency.monthly ? [startDate.day] : [biweeklyDays.$1, biweeklyDays.$2];
+        var y = lo.year, m = lo.month;
+        while (!DateTime(y, m, 1).isAfter(hi)) {
+          for (final day in wanted) {
+            final d = DateTime(y, m, day.clamp(1, _daysInMonth(y, m)));
+            if (!d.isBefore(lo) && !d.isAfter(hi) && (out.isEmpty || out.last != d)) out.add(d);
+          }
+          m++;
+          if (m > 12) {
+            m = 1;
+            y++;
+          }
+        }
+    }
+    return out;
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'description': description,
+        'amount': amount,
+        'accountId': accountId,
+        'isIncome': isIncome,
+        'frequency': frequency.name,
+        'intervalDays': intervalDays,
+        'startDate': _d(startDate),
+        'endDate': endDate == null ? null : _d(endDate!),
+        'active': active,
+      };
+
+  factory Recurrence.fromJson(Map<String, dynamic> j) => Recurrence(
+        id: j['id'],
+        description: j['description'] ?? '',
+        amount: j['amount'],
+        accountId: j['accountId'],
+        isIncome: j['isIncome'] ?? true,
+        frequency: Frequency.values.byName(j['frequency']),
+        intervalDays: j['intervalDays'] ?? 7,
+        startDate: _p(j['startDate']),
+        endDate: j['endDate'] == null ? null : _p(j['endDate']),
+        active: j['active'] ?? true,
       );
 }
 

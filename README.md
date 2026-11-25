@@ -7,30 +7,40 @@ La especificación completa está en [`docs/especificacion.md`](docs/especificac
 
 > Regla principal: **nunca confundir el dinero que realmente tienes con el dinero que esperas recibir.**
 
-## Estado actual: v0.2 (núcleo financiero + deudas y cuotas)
+## Estado actual: v0.3 (calendario financiero)
 
 | Versión | Contenido | Estado |
 |---|---|---|
 | 0.1 | Saldo físico / digital / total, ingresos, gastos, transferencias, historial | ✅ |
 | 0.2 | Deudas, cuotas variables, pagos y abonos parciales, saldo pendiente | ✅ |
-| 0.3 | Calendario mensual/semanal, ingresos recurrentes | 🟡 Agenda de próximos eventos e ingresos previstos (sin recurrencias aún) |
+| 0.3 | Calendario mensual, semanal y agenda; ingresos y gastos recurrentes; pagos integrados | ✅ |
 | 0.4 | Notificaciones, exportación Excel/CSV | ⏳ |
-| 0.5 | Proyecciones y escenarios | 🟡 Saldo proyectado básico en la agenda |
-| 1.0 | Asistente, capturas, sincronización con Supabase | ⏳ (esquema SQL listo) |
+| 0.5 | Proyecciones y escenarios | 🟡 Saldo proyectado y alerta de saldo negativo |
+| 1.0 | Asistente, capturas, sincronización con Supabase | ⏳ (esquema SQL y configuración listos) |
 
 ### Lo que ya funciona
-- **Inicio**: dinero físico, dinero digital y total disponible (solo dinero real), próximo pago, próximo ingreso, deudas pendientes, pagos del mes, resumen del mes y alertas (cuotas vencidas, pagos de la semana, saldo insuficiente, deudas cuyo monto no coincide con sus cuotas).
+- **Inicio**: dinero físico, dinero digital y total disponible (solo dinero real), próximo pago, próximo ingreso,
+  deudas pendientes, pagos del mes, lista de próximos pagos, resumen del mes y alertas (cuotas vencidas, pagos de la
+  semana, saldo proyectado negativo, deudas cuyo monto no coincide con sus cuotas).
 - **Cuentas**: varias cuentas físicas o digitales; corrección de saldo con registro del ajuste.
-- **Movimientos**: ingreso, gasto, pago de deuda, transferencia (no cuenta como ingreso ni gasto) y ajuste manual; filtros por tipo y cuenta; eliminación con confirmación.
-- **Deudas**: monto original independiente de las cuotas; cuotas con importe y fecha propios; flujo de pago (cuota → importe y fecha → cuenta → fecha real → confirmación → descuento único); abonos parciales; edición de cuota mostrando el valor anterior y el nuevo; la deuda se marca liquidada sola.
-- **Agenda**: cuotas pendientes e ingresos previstos de los próximos 90 días, vinculados a su origen (sin duplicados), con saldo proyectado que no toca los saldos reales; permite confirmar ingresos o marcarlos como no recibidos.
-- **Ajustes**: gestión de cuentas, respaldo/restauración (JSON por portapapeles) e historial de cambios (auditoría).
-- Dinero siempre en **centavos enteros**; operaciones **atómicas** (se aplican sobre una copia y solo se guardan si son válidas).
+- **Movimientos**: ingreso, gasto, pago de deuda, transferencia (no cuenta como ingreso ni gasto) y ajuste manual.
+- **Deudas**: monto original independiente de las cuotas; cuotas con importe y fecha propios; flujo de pago con
+  confirmación y descuento único; abonos parciales; edición controlada; liquidación automática.
+- **Calendario financiero**:
+  - Vistas **mensual**, **semanal** y **agenda**, con colores para ingresos, pagos pendientes, vencidos, pagados y no recibidos.
+  - **Reglas recurrentes** de ingresos o gastos: diaria, semanal, quincenal (ej. días 1 y 16), mensual (ajusta el
+    día 31 a meses cortos) o cada N días, con fecha final opcional; se pueden pausar, editar o eliminar.
+  - Cada fecha se **confirma por separado** (con el importe real), se marca como **no recibida** o se **ajusta**
+    sin tocar la regla. Las cuotas de las deudas aparecen solas y vinculadas a su cuota original: nunca se duplican.
+  - La agenda muestra el **saldo proyectado** después de cada evento; los ingresos atrasados no se suman hasta confirmarse.
+- **Ajustes**: gestión de cuentas, respaldo/restauración (JSON) e historial de cambios (auditoría).
+- Dinero siempre en **centavos enteros**; operaciones **atómicas**.
 
 ## Estructura
 
 ```
 lib/
+  config/      Configuración pública de Supabase (URL y clave publishable)
   domain/      Motor financiero en Dart puro (sin Flutter)
     money.dart   Centavos, formato y lectura de importes sin punto flotante
     models.dart  Cuentas, movimientos, deudas, cuotas, ingresos previstos, auditoría

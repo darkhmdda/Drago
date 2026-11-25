@@ -50,7 +50,7 @@ void main() {
       l.setBalance(accountId: cash, newBalance: 50000);
       final s = l.addScheduledIncome(accountId: cash, amount: 40000, date: DateTime(2026, 11, 28));
       expect(l.totalAvailable, 50000);
-      expect(l.nextIncome?.id, s.id);
+      expect(l.nextIncome?.scheduledItemId, s.id);
       l.confirmScheduledIncome(s.id);
       expect(l.totalAvailable, 90000);
       expect(() => l.confirmScheduledIncome(s.id), throwsA(isA<FinanceException>()));
