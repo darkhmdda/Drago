@@ -6,7 +6,7 @@ name: Compilar y publicar
 
 on:
   push:
-    branches: [main, claude/zealous-cerf-qh0xse]
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
