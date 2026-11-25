@@ -26,6 +26,17 @@ class SupabaseSyncRemote implements SyncRemote {
     }
   }
 
+  @override
+  Future<void> clearAuditLog() async {
+    try {
+      await client.rpc('clear_my_audit_log');
+    } on PostgrestException catch (e) {
+      throw SyncFailure(_explain(e));
+    } catch (_) {
+      throw const SyncFailure('Sin conexión: no se pudo borrar la información en la nube. Inténtalo de nuevo con internet.');
+    }
+  }
+
   RealtimeChannel? _channel;
 
   /// Escucha en tiempo real los cambios de versión del usuario (cuando otro

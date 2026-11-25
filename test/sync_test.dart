@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:drago/data/app_state.dart';
 import 'package:drago/data/storage.dart';
 import 'package:drago/data/sync_service.dart';
+import 'package:drago/domain/ledger.dart';
 import 'package:drago/domain/models.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -26,6 +27,14 @@ class FakeRemote implements SyncRemote {
   Future<Map<String, dynamic>> pull() async {
     if (!cloud.online) throw const SyncFailure('Sin conexión');
     return {...jsonDecode(cloud.data) as Map<String, dynamic>, 'syncVersion': cloud.version};
+  }
+
+  @override
+  Future<void> clearAuditLog() async {
+    if (!cloud.online) throw const SyncFailure('Sin conexión');
+    final d = jsonDecode(cloud.data) as Map<String, dynamic>;
+    d['auditLog'] = [];
+    cloud.data = jsonEncode(d);
   }
 
   @override
@@ -146,6 +155,23 @@ void main() {
     await sb.checkRemote(); // la nube cambió: descarga
     expect(b.ledger.totalAvailable, 42000);
     expect(remote.userId, 'u1');
+  });
+
+  test('Borrar todo: limpia este dispositivo, la nube y los demás dispositivos', () async {
+    final cloud = FakeCloud();
+    final (a, sa) = await device(cloud, 'A');
+    await a.run((l) => l.setBalance(accountId: cashOf(a), newBalance: 50000));
+    await sa.sync();
+    final (b, sb) = await device(cloud, 'B');
+    await sb.sync();
+    expect(b.ledger.totalAvailable, 50000);
+
+    await sa.wipeEverything(Ledger.withDefaults());
+    expect(a.ledger.transactions, isEmpty);
+    expect(jsonDecode(cloud.data)['transactions'], isEmpty);
+    await sb.sync(); // B no tenía cambios: recibe la versión limpia
+    expect(b.ledger.transactions, isEmpty);
+    expect(b.ledger.totalAvailable, 0);
   });
 
   test('Sin sesión no se sincroniza nada', () async {

@@ -10,6 +10,8 @@ import '../domain/models.dart';
 import '../domain/money.dart';
 import 'common.dart';
 import '../data/exporter.dart';
+import '../data/sync_scope.dart';
+import '../data/sync_service.dart';
 import 'sync_widgets.dart';
 import 'themes.dart';
 import 'notifications_screen.dart';
@@ -100,6 +102,16 @@ class SettingsScreen extends StatelessWidget {
           if (l.auditLog.isEmpty) const ListTile(title: Text('Sin cambios registrados.')),
         ]),
       ),
+      const SectionTitle('Zona de peligro'),
+      Card(
+        child: ListTile(
+          leading: Icon(Icons.delete_forever_outlined, color: Theme.of(context).colorScheme.error),
+          title: Text('Borrar todos mis datos', style: TextStyle(color: Theme.of(context).colorScheme.error)),
+          subtitle: const Text('Deja la cuenta limpia: movimientos, deudas, previstos, simulaciones e historial. '
+              'Si tienes sesión iniciada, también se borra de la nube y de tus otros dispositivos.'),
+          onTap: () => _wipe(context),
+        ),
+      ),
       const SizedBox(height: 16),
       const Center(child: Text('Drago · v1.0 · los datos se guardan primero en este dispositivo', style: TextStyle(fontSize: 12))),
     ]);
@@ -153,6 +165,65 @@ class SettingsScreen extends StatelessWidget {
     if (ok != true || !context.mounted) return;
     await runOp(context, (l) => l.createAccount(name.text, kind, initialBalance: parseMoney(initial.text)!),
         success: 'Cuenta creada');
+  }
+
+  Future<void> _wipe(BuildContext context) async {
+    final sync = SyncScope.of(context).sync;
+    final signedIn = sync != null && sync.status != SyncStatus.signedOut;
+    final c = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (d) => StatefulBuilder(
+        builder: (d, setState) => AlertDialog(
+          title: const Text('Borrar todos mis datos'),
+          content: SizedBox(
+            width: 440,
+            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(signedIn
+                  ? 'Se borrará TODO en este dispositivo, en la nube y en tus otros dispositivos. Tu cuenta, tema y '
+                      'recordatorios se conservan. Esta acción no se puede deshacer.'
+                  : 'Se borrará TODO en este dispositivo. Esta acción no se puede deshacer.'),
+              const SizedBox(height: 8),
+              TextButton.icon(
+                onPressed: () async {
+                  final json = AppScope.of(context).exportBackup();
+                  final stamp = DateTime.now().toIso8601String().substring(0, 10);
+                  await saveFile(Uint8List.fromList(utf8.encode(json)), 'drago_respaldo_$stamp.json', 'application/json');
+                },
+                icon: const Icon(Icons.save_alt),
+                label: const Text('Descargar un respaldo antes'),
+              ),
+              const SizedBox(height: 8),
+              const Text('Para confirmar escribe BORRAR:'),
+              const SizedBox(height: 6),
+              TextField(controller: c, autofocus: true, onChanged: (_) => setState(() {}), decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true)),
+            ]),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancelar')),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: Theme.of(d).colorScheme.error),
+              onPressed: c.text.trim().toUpperCase() == 'BORRAR' ? () => Navigator.pop(d, true) : null,
+              child: const Text('Borrar todo'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (ok != true || !context.mounted) return;
+    try {
+      final fresh = Ledger.withDefaults();
+      if (sync != null) {
+        await sync.wipeEverything(fresh);
+      } else {
+        await AppScope.of(context).replaceFromSync(fresh);
+      }
+      if (context.mounted) showMessage(context, 'Listo: tu cuenta está limpia.');
+    } on SyncFailure catch (e) {
+      if (context.mounted) showMessage(context, '${e.message} No se borró nada.', error: true);
+    } catch (e) {
+      if (context.mounted) showMessage(context, 'No se pudo borrar: $e. No se borró nada.', error: true);
+    }
   }
 
   Future<void> _restoreFromFile(BuildContext context) async {

@@ -33,6 +33,9 @@ abstract class SyncRemote {
 
   /// Solo el número de versión en la nube (consulta mínima, para revisar seguido).
   Future<int> remoteVersion();
+
+  /// Vacía el historial de cambios del usuario en la nube.
+  Future<void> clearAuditLog();
 }
 
 enum SyncStatus { signedOut, idle, syncing, pending, offline, conflict }
@@ -215,6 +218,26 @@ class SyncService extends ChangeNotifier {
     await _saveMeta();
     notifyListeners();
     await sync();
+  }
+
+  /// Borra TODO: deja este dispositivo con datos nuevos y, si hay sesión,
+  /// sube esa versión vacía a la nube (los demás dispositivos la reciben) y
+  /// vacía el historial de cambios en la nube.
+  Future<void> wipeEverything(Ledger fresh) async {
+    _timer?.cancel();
+    conflict = null;
+    if (remote.userId != null) {
+      final v = await remote.remoteVersion();
+      await remote.clearAuditLog();
+      _base = await remote.push(v, fresh.toJson());
+      _syncedUser = remote.userId;
+    }
+    await app.replaceFromSync(fresh);
+    _dirty = remote.userId == null;
+    lastError = null;
+    lastSync = remote.userId == null ? lastSync : DateTime.now();
+    await _saveMeta();
+    notifyListeners();
   }
 
   /// Llamar al cerrar sesión.

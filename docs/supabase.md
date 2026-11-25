@@ -22,6 +22,7 @@ Si ya ejecutaste una versión anterior del script, ejecuta solo los archivos nue
 |---|---|
 | `20261127000000_realtime.sql` | Avisos en tiempo real entre dispositivos |
 | `20261128000000_scenarios.sql` | Sincronizar las simulaciones guardadas |
+| `20261129000000_wipe.sql` | «Borrar todos mis datos» también limpia el historial en la nube |
 
 ## 2. Ajustes de autenticación
 
