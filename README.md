@@ -7,14 +7,14 @@ La especificación completa está en [`docs/especificacion.md`](docs/especificac
 
 > Regla principal: **nunca confundir el dinero que realmente tienes con el dinero que esperas recibir.**
 
-## Estado actual: v0.3 (calendario financiero)
+## Estado actual: v0.4 (notificaciones y reportes)
 
 | Versión | Contenido | Estado |
 |---|---|---|
 | 0.1 | Saldo físico / digital / total, ingresos, gastos, transferencias, historial | ✅ |
 | 0.2 | Deudas, cuotas variables, pagos y abonos parciales, saldo pendiente | ✅ |
 | 0.3 | Calendario mensual, semanal y agenda; ingresos y gastos recurrentes; pagos integrados | ✅ |
-| 0.4 | Notificaciones, exportación Excel/CSV | ⏳ |
+| 0.4 | Recordatorios de pagos, centro de notificaciones, reportes mensuales, exportación Excel/CSV | ✅ |
 | 0.5 | Proyecciones y escenarios | 🟡 Saldo proyectado y alerta de saldo negativo |
 | — | Cuenta y sincronización con Supabase (adelantado de la 1.0) | ✅ Ver [docs/supabase.md](docs/supabase.md) |
 | 1.0 | Asistente, capturas | ⏳ |
@@ -37,7 +37,11 @@ La especificación completa está en [`docs/especificacion.md`](docs/especificac
 - **Cuenta y sincronización** (opcional): inicio de sesión con correo; los datos se guardan primero en el dispositivo
   y se sincronizan con Supabase; si dos dispositivos cambian a la vez, la app pregunta qué copia conservar.
 - **Temas**: Clásico, Clásico oscuro, Ryusui y Nami (Ajustes → Apariencia), con colores de ingresos, gastos y pendientes adaptados a cada uno.
-- **Ajustes**: gestión de cuentas, respaldo/restauración (JSON) e historial de cambios (auditoría).
+- **Recordatorios**: notificaciones del sistema en Android (1 semana, 2 días, 1 día antes y el día del pago, configurable,
+  con hora elegida) que se cancelan al pagar y se mueven si cambia la fecha; centro de notificaciones (campana) en web y Android.
+- **Reportes**: resumen mensual con comparación contra el mes anterior, gastos por categoría y pagos por deuda;
+  exportación a Excel (Resumen, Movimientos, Deudas, Cuotas, Calendario, Proyección) y CSV, por periodo.
+- **Ajustes** (engrane arriba a la derecha): gestión de cuentas, respaldo/restauración (JSON) e historial de cambios (auditoría).
 - Dinero siempre en **centavos enteros**; operaciones **atómicas**.
 
 ## Estructura

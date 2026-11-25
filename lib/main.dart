@@ -11,6 +11,8 @@ import 'data/storage.dart';
 import 'data/supabase_remote.dart';
 import 'data/sync_scope.dart';
 import 'data/sync_service.dart';
+import 'data/notification_service.dart';
+import 'ui/notifications_screen.dart';
 import 'ui/shell.dart';
 import 'ui/themes.dart';
 
@@ -41,10 +43,31 @@ Future<void> main() async {
     debugPrint('Sincronización no disponible: $e');
   }
 
-  runApp(DragoApp(state: state, theme: theme, sync: sync, auth: auth));
+  // Recordatorios: si fallan, la app sigue funcionando sin ellos.
+  NotificationService? notifications = NotificationService(state);
+  try {
+    await notifications.init();
+  } catch (e) {
+    debugPrint('Recordatorios no disponibles: $e');
+    notifications = null;
+  }
+
+  runApp(
+    DragoApp(
+      state: state,
+      theme: theme,
+      sync: sync,
+      auth: auth,
+      notifications: notifications,
+    ),
+  );
 }
 
-void _wireSync(SupabaseClient client, SupabaseSyncRemote remote, SyncService sync) {
+void _wireSync(
+  SupabaseClient client,
+  SupabaseSyncRemote remote,
+  SyncService sync,
+) {
   client.auth.onAuthStateChange.listen((data) {
     switch (data.event) {
       case AuthChangeEvent.initialSession:
@@ -108,7 +131,8 @@ Future<void> _askNewPassword(SupabaseClient client) async {
   } on AuthException catch (e) {
     final ctx = navigatorKey.currentContext;
     if (ctx != null && ctx.mounted) {
-      ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(e.message)));
+      ScaffoldMessenger.of(ctx)
+          .showSnackBar(SnackBar(content: Text(e.message)));
     }
   }
 }
@@ -118,12 +142,14 @@ class DragoApp extends StatelessWidget {
   final ThemeController theme;
   final SyncService? sync;
   final AuthService? auth;
+  final NotificationService? notifications;
   const DragoApp({
     super.key,
     required this.state,
     required this.theme,
     this.sync,
     this.auth,
+    this.notifications,
   });
 
   @override
@@ -133,23 +159,26 @@ class DragoApp extends StatelessWidget {
       child: SyncScope(
         sync: sync,
         auth: auth,
-        child: ThemeScope(
-          controller: theme,
-          child: ListenableBuilder(
-            listenable: theme,
-            builder: (context, _) => MaterialApp(
-              navigatorKey: navigatorKey,
-              title: 'Drago',
-              debugShowCheckedModeBanner: false,
-              locale: const Locale('es', 'MX'),
-              supportedLocales: const [
-                Locale('es', 'MX'),
-                Locale('es'),
-                Locale('en'),
-              ],
-              localizationsDelegates: GlobalMaterialLocalizations.delegates,
-              theme: theme.theme.data,
-              home: const AppShell(),
+        child: NotificationScope(
+          service: notifications,
+          child: ThemeScope(
+            controller: theme,
+            child: ListenableBuilder(
+              listenable: theme,
+              builder: (context, _) => MaterialApp(
+                navigatorKey: navigatorKey,
+                title: 'Drago',
+                debugShowCheckedModeBanner: false,
+                locale: const Locale('es', 'MX'),
+                supportedLocales: const [
+                  Locale('es', 'MX'),
+                  Locale('es'),
+                  Locale('en'),
+                ],
+                localizationsDelegates: GlobalMaterialLocalizations.delegates,
+                theme: theme.theme.data,
+                home: const AppShell(),
+              ),
             ),
           ),
         ),

@@ -8,6 +8,8 @@ import '../domain/money.dart';
 import 'common.dart';
 import 'sync_widgets.dart';
 import 'themes.dart';
+import 'notifications_screen.dart';
+import '../domain/reminders.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -43,6 +45,8 @@ class SettingsScreen extends StatelessWidget {
             ),
           ),
         ),
+      const SectionTitle('Recordatorios'),
+      const _ReminderSettings(),
       const SectionTitle('Apariencia'),
       const _ThemePicker(),
       const SectionTitle('Respaldo'),
@@ -75,7 +79,7 @@ class SettingsScreen extends StatelessWidget {
         ]),
       ),
       const SizedBox(height: 16),
-      const Center(child: Text('Drago · v0.3.1 · los datos se guardan primero en este dispositivo', style: TextStyle(fontSize: 12))),
+      const Center(child: Text('Drago · v0.4 · los datos se guardan primero en este dispositivo', style: TextStyle(fontSize: 12))),
     ]);
   }
 
@@ -248,6 +252,97 @@ class _ThemeCard extends StatelessWidget {
             ]),
           ]),
         ),
+      ),
+    );
+  }
+}
+
+class _ReminderSettings extends StatelessWidget {
+  const _ReminderSettings();
+
+  @override
+  Widget build(BuildContext context) {
+    final n = NotificationScope.of(context);
+    if (n == null) return const SizedBox.shrink();
+    final s = n.settings;
+    Future<void> set(ReminderSettings v) => n.updateSettings(v);
+    const options = [(7, '1 semana antes'), (2, '2 días antes'), (1, '1 día antes'), (0, 'El día del pago')];
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          SwitchListTile(
+            title: const Text('Recordatorios de pagos'),
+            subtitle: Text(n.supportsSystemNotifications
+                ? 'Notificaciones en este teléfono, aunque la app esté cerrada.'
+                : 'En la web los avisos aparecen en la campana. Las notificaciones del sistema están en la app de Android.'),
+            value: s.enabled,
+            onChanged: (v) => set(s.copyWith(enabled: v)),
+          ),
+          if (s.enabled) ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+              child: Text('Avisar', style: Theme.of(context).textTheme.labelLarge),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              child: Wrap(spacing: 8, runSpacing: 4, children: [
+                for (final (d, label) in options)
+                  FilterChip(
+                    label: Text(label),
+                    selected: s.daysBefore.contains(d),
+                    onSelected: (on) {
+                      final next = {...s.daysBefore};
+                      on ? next.add(d) : next.remove(d);
+                      set(s.copyWith(daysBefore: next.toList()..sort((a, b) => b.compareTo(a))));
+                    },
+                  ),
+              ]),
+            ),
+            ListTile(
+              leading: const Icon(Icons.schedule),
+              title: const Text('Hora del aviso'),
+              trailing: Text(TimeOfDay(hour: s.hour, minute: s.minute).format(context),
+                  style: const TextStyle(fontWeight: FontWeight.w600)),
+              onTap: () async {
+                final t = await showTimePicker(context: context, initialTime: TimeOfDay(hour: s.hour, minute: s.minute));
+                if (t != null) set(s.copyWith(hour: t.hour, minute: t.minute));
+              },
+            ),
+            SwitchListTile(
+              title: const Text('Recordar ingresos previstos'),
+              subtitle: const Text('El día que esperas un ingreso, para que lo confirmes.'),
+              value: s.incomeReminders,
+              onChanged: (v) => set(s.copyWith(incomeReminders: v)),
+            ),
+            if (n.supportsSystemNotifications)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                child: Wrap(spacing: 8, runSpacing: 8, children: [
+                  if (n.permissionGranted != true)
+                    FilledButton.icon(
+                      onPressed: () async {
+                        final ok = await n.requestPermission();
+                        if (context.mounted && !ok) {
+                          showMessage(context, 'Permiso denegado. Actívalo en Ajustes del teléfono → Apps → Drago → Notificaciones.',
+                              error: true);
+                        }
+                      },
+                      icon: const Icon(Icons.notifications_active_outlined),
+                      label: const Text('Permitir notificaciones'),
+                    ),
+                  OutlinedButton.icon(
+                    onPressed: () async {
+                      if (n.permissionGranted != true && !await n.requestPermission()) return;
+                      await n.showTest();
+                    },
+                    icon: const Icon(Icons.send_outlined),
+                    label: const Text('Probar notificación'),
+                  ),
+                ]),
+              ),
+          ],
+        ]),
       ),
     );
   }

@@ -5,6 +5,8 @@ import 'debts_screen.dart';
 import 'dialogs.dart';
 import 'home_screen.dart';
 import 'movements_screen.dart';
+import 'notifications_screen.dart';
+import 'reports_screen.dart';
 import 'settings_screen.dart';
 import 'sync_widgets.dart';
 
@@ -17,13 +19,13 @@ class AppShell extends StatefulWidget {
 class _AppShellState extends State<AppShell> {
   int _index = 0;
 
-  static const _titles = ['Inicio', 'Deudas y pagos', 'Calendario financiero', 'Movimientos', 'Configuración'];
+  static const _titles = ['Inicio', 'Deudas y pagos', 'Calendario financiero', 'Movimientos', 'Reportes'];
   static const _destinations = [
     (Icons.home_outlined, Icons.home, 'Inicio'),
     (Icons.credit_card_outlined, Icons.credit_card, 'Deudas'),
     (Icons.calendar_month_outlined, Icons.calendar_month, 'Calendario'),
     (Icons.receipt_long_outlined, Icons.receipt_long, 'Movimientos'),
-    (Icons.settings_outlined, Icons.settings, 'Ajustes'),
+    (Icons.bar_chart_outlined, Icons.bar_chart, 'Reportes'),
   ];
 
   @override
@@ -34,7 +36,7 @@ class _AppShellState extends State<AppShell> {
       const DebtsScreen(),
       const CalendarScreen(),
       const MovementsScreen(),
-      const SettingsScreen(),
+      const ReportsScreen(),
     ];
     final fab = switch (_index) {
       1 => FloatingActionButton.extended(
@@ -51,7 +53,12 @@ class _AppShellState extends State<AppShell> {
     return Scaffold(
       appBar: AppBar(
         title: Text(_titles[_index]),
-        actions: [SyncIndicator(onTap: () => setState(() => _index = 4)), const SizedBox(width: 8)],
+        actions: [
+          const NotificationBell(),
+          SyncIndicator(onTap: () => openSettings(context)),
+          IconButton(tooltip: 'Ajustes', icon: const Icon(Icons.settings_outlined), onPressed: () => openSettings(context)),
+          const SizedBox(width: 4),
+        ],
       ),
       floatingActionButton: fab,
       bottomNavigationBar: wide
@@ -98,3 +105,9 @@ class _AppShellState extends State<AppShell> {
     );
   }
 }
+
+/// Ajustes se abre como pantalla aparte (engrane de la barra superior).
+void openSettings(BuildContext context) => Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => Scaffold(appBar: AppBar(title: const Text('Ajustes')), body: const SettingsScreen())),
+    );
