@@ -216,3 +216,31 @@ ProjectionResult simulate(Ledger real, Scenario s, {int days = 60}) {
   }
   return _result(copy, days, skipped: skipped);
 }
+
+/// Historial de saldos reales: saldo físico y digital al cierre de cada día
+/// entre [from] y [to] (solo movimientos confirmados).
+List<(DateTime, Cents, Cents)> balanceHistory(Ledger l, DateTime from, DateTime to) {
+  final kindOf = {for (final a in l.accounts) a.id: a.kind};
+  final txs = [...l.transactions]..sort((a, b) => a.date.compareTo(b.date));
+  var phys = 0, dig = 0, k = 0;
+  void apply(Transaction t) {
+    for (final id in {t.accountId, ?t.toAccountId}) {
+      final e = t.effectOn(id);
+      if (kindOf[id] == AccountKind.physical) {
+        phys += e;
+      } else {
+        dig += e;
+      }
+    }
+  }
+
+  final out = <(DateTime, Cents, Cents)>[];
+  for (var d = DateTime(from.year, from.month, from.day); !d.isAfter(to); d = DateTime(d.year, d.month, d.day + 1)) {
+    while (k < txs.length && !txs[k].date.isAfter(d)) {
+      apply(txs[k]);
+      k++;
+    }
+    out.add((d, phys, dig));
+  }
+  return out;
+}

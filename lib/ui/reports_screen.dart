@@ -9,6 +9,7 @@ import '../domain/models.dart';
 import '../domain/money.dart';
 import '../domain/report.dart';
 import 'common.dart';
+import 'history_view.dart';
 import 'projections_view.dart';
 
 /// Reportes: resumen mensual y exportación a Excel / CSV.
@@ -60,8 +61,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
         child: SegmentedButton<int>(
           showSelectedIcon: false,
           segments: const [
-            ButtonSegment(value: 0, label: Text('Mensual'), icon: Icon(Icons.bar_chart)),
-            ButtonSegment(value: 1, label: Text('Proyecciones'), icon: Icon(Icons.show_chart)),
+            ButtonSegment(value: 0, label: Text('Mensual')),
+            ButtonSegment(value: 1, label: Text('Proyección')),
+            ButtonSegment(value: 2, label: Text('Historial')),
           ],
           selected: {_tab},
           onSelectionChanged: (v) => setState(() => _tab = v.first),
@@ -77,6 +79,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
     final label = toBeginningOfSentenceCase(DateFormat('MMMM y', 'es_MX').format(_month));
 
     if (_tab == 1) return PageBody(children: [_tabs, const ProjectionsView()]);
+    if (_tab == 2) return PageBody(children: [_tabs, const HistoryView()]);
     return PageBody(children: [
       _tabs,
       Row(children: [

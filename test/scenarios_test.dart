@@ -102,4 +102,13 @@ void main() {
     final r = simulate(l, sc([const ScenarioAdjustment(kind: AdjustmentKind.moveInstallment, installmentId: 'no-existe')]));
     expect(r.skipped, hasLength(1));
   });
+
+  test('Historial de saldos: físico y digital por día, transferencias incluidas', () {
+    final bank = l.accounts.firstWhere((a) => a.kind == AccountKind.digital).id;
+    l.addExpense(accountId: cash, amount: 8000, date: DateTime(2026, 11, 25));
+    l.transfer(fromAccountId: cash, toAccountId: bank, amount: 10000, date: DateTime(2026, 11, 25));
+    final h = balanceHistory(l, DateTime(2026, 11, 24), DateTime(2026, 11, 25));
+    expect(h.first, (DateTime(2026, 11, 24), 0, 0));
+    expect(h.last, (DateTime(2026, 11, 25), 32000, 10000));
+  });
 }
