@@ -62,20 +62,22 @@ jobs:
             echo "::warning::Faltan los secretos ANDROID_KEYSTORE_BASE64 / ANDROID_KEYSTORE_PASSWORD. Se firma con una llave temporal: el APK no podrá instalarse encima de otra versión."
           fi
 
-      - name: Compilar APK
-        run: flutter build apk --release --build-number=${{ github.run_number }}
+      - name: Compilar APK (uno por tipo de procesador, más ligero)
+        run: flutter build apk --release --split-per-abi --build-number=${{ github.run_number }}
 
       - name: Publicar APK (versión android-latest)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cp build/app/outputs/flutter-apk/app-release.apk drago.apk
+          # drago.apk = teléfonos de 64 bits (casi todos); drago-32bits.apk = teléfonos antiguos.
+          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk drago.apk
+          cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk drago-32bits.apk
           VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //; s/+.*//')
           gh release delete android-latest --yes --cleanup-tag || true
-          gh release create android-latest drago.apk \
+          gh release create android-latest drago.apk drago-32bits.apk \
             --target "$GITHUB_SHA" \
             --title "Drago para Android · v$VERSION (compilación ${{ github.run_number }})" \
-            --notes "Descarga **drago.apk** desde el teléfono e instálalo. Compilado desde ${GITHUB_SHA::7}." \
+            --notes "Descarga **drago.apk** desde el teléfono e instálalo. Si tu teléfono es muy antiguo y no instala, usa **drago-32bits.apk**. Compilado desde ${GITHUB_SHA::7}." \
             --latest
 
   web:

@@ -47,3 +47,4 @@ Así los enlaces de confirmación de correo y de «Olvidé mi contraseña» abre
    (o la página **Releases** del repositorio) y descarga **drago.apk**.
 2. Ábrelo y permite «instalar apps de fuentes desconocidas» para el navegador cuando lo pida.
 3. Para actualizar, repite: se instala encima conservando los datos.
+4. Si tu teléfono es muy antiguo (32 bits) y `drago.apk` no instala, usa `drago-32bits.apk` de la misma página.
