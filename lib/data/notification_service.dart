@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart' show Color;
+import 'package:flutter/widgets.dart' show AppLifecycleListener;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest_all.dart' as tzdata;
@@ -31,7 +32,11 @@ class NotificationService extends ChangeNotifier {
   Set<String> _seen = {};
   bool _systemReady = false;
   bool? permissionGranted;
+
+  /// Motivo por el que no se pudo iniciar el sistema de notificaciones.
+  String? initError;
   Timer? _debounce;
+  AppLifecycleListener? _lifecycle;
 
   /// true si este dispositivo puede mostrar notificaciones del sistema.
   bool get supportsSystemNotifications => !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
@@ -46,20 +51,49 @@ class NotificationService extends ChangeNotifier {
     }
     _seen = (p.getStringList(_kSeen) ?? const []).toSet();
 
-    if (supportsSystemNotifications) {
+    if (supportsSystemNotifications) await _initSystem();
+    app.addListener(_scheduleSoon);
+    if (supportsSystemNotifications) _lifecycle = AppLifecycleListener(onResume: refreshPermission);
+    await reschedule();
+  }
+
+  Future<void> _initSystem() async {
+    try {
+      tzdata.initializeTimeZones();
       try {
-        tzdata.initializeTimeZones();
         await _plugin.initialize(
           settings: const InitializationSettings(android: AndroidInitializationSettings('@drawable/ic_stat_drago')),
         );
-        _systemReady = true;
-        permissionGranted = await _android?.areNotificationsEnabled();
-      } catch (e) {
-        debugPrint('Notificaciones no disponibles: $e');
+      } catch (_) {
+        // Respaldo: el icono de la app siempre existe.
+        await _plugin.initialize(
+          settings: const InitializationSettings(android: AndroidInitializationSettings('@mipmap/ic_launcher')),
+        );
       }
+      _systemReady = true;
+      initError = null;
+      permissionGranted = await _android?.areNotificationsEnabled();
+    } catch (e) {
+      initError = '$e';
+      debugPrint('Notificaciones no disponibles: $e');
     }
-    app.addListener(_scheduleSoon);
-    await reschedule();
+  }
+
+  /// Vuelve a consultar si el permiso está activo (por ejemplo, al regresar
+  /// de los ajustes del teléfono).
+  Future<void> refreshPermission() async {
+    if (!supportsSystemNotifications) return;
+    if (!_systemReady) await _initSystem();
+    if (_systemReady) permissionGranted = await _android?.areNotificationsEnabled();
+    notifyListeners();
+    if (permissionGranted == true) await reschedule();
+  }
+
+  /// Abre la pantalla de notificaciones de Drago en los ajustes del teléfono.
+  Future<void> openSystemSettings() async {
+    try {
+      await _android?.openAppNotificationSettings();
+    } catch (_) {}
   }
 
   AndroidFlutterLocalNotificationsPlugin? get _android =>
@@ -67,8 +101,18 @@ class NotificationService extends ChangeNotifier {
 
   /// Pide permiso (Android 13+). Debe llamarse tras una acción del usuario.
   Future<bool> requestPermission() async {
-    if (!_systemReady) return false;
-    permissionGranted = await _android?.requestNotificationsPermission() ?? false;
+    if (!_systemReady) await _initSystem();
+    if (!_systemReady) {
+      notifyListeners();
+      return false;
+    }
+    try {
+      permissionGranted = await _android?.requestNotificationsPermission() ?? false;
+    } catch (_) {
+      // Si ya había una solicitud en curso, se consulta el estado actual.
+      permissionGranted = await _android?.areNotificationsEnabled() ?? false;
+    }
+    if (permissionGranted != true) permissionGranted = await _android?.areNotificationsEnabled() ?? false;
     notifyListeners();
     if (permissionGranted == true) await reschedule();
     return permissionGranted!;
@@ -136,6 +180,7 @@ class NotificationService extends ChangeNotifier {
 
   /// Muestra una notificación de prueba ahora mismo.
   Future<void> showTest() async {
+    if (!_systemReady) await _initSystem();
     if (!_systemReady) return;
     await _plugin.show(
       id: 1,
@@ -168,6 +213,7 @@ class NotificationService extends ChangeNotifier {
   void dispose() {
     app.removeListener(_scheduleSoon);
     _debounce?.cancel();
+    _lifecycle?.dispose();
     super.dispose();
   }
 }

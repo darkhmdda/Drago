@@ -432,16 +432,31 @@ class _ReminderSettings extends StatelessWidget {
               value: s.incomeReminders,
               onChanged: (v) => set(s.copyWith(incomeReminders: v)),
             ),
-            if (n.supportsSystemNotifications)
+            if (n.supportsSystemNotifications) ...[
+              ListTile(
+                dense: true,
+                leading: Icon(
+                  n.permissionGranted == true ? Icons.check_circle : Icons.error_outline,
+                  color: n.permissionGranted == true ? FinColors.of(context).income : Theme.of(context).colorScheme.error,
+                ),
+                title: Text(n.initError != null
+                    ? 'No se pudo iniciar el sistema de notificaciones'
+                    : (n.permissionGranted == true ? 'Notificaciones permitidas en este teléfono' : 'Las notificaciones están desactivadas')),
+                subtitle: n.initError != null ? Text(n.initError!, maxLines: 3, overflow: TextOverflow.ellipsis) : null,
+              ),
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                 child: Wrap(spacing: 8, runSpacing: 8, children: [
                   if (n.permissionGranted != true)
                     FilledButton.icon(
                       onPressed: () async {
                         final ok = await n.requestPermission();
                         if (context.mounted && !ok) {
-                          showMessage(context, 'Permiso denegado. Actívalo en Ajustes del teléfono → Apps → Drago → Notificaciones.',
+                          showMessage(
+                              context,
+                              n.initError != null
+                                  ? 'El sistema de notificaciones no arrancó. Abre los ajustes de notificaciones del teléfono.'
+                                  : 'Android no dio el permiso. Usa «Abrir ajustes de notificaciones» y activa las de Drago.',
                               error: true);
                         }
                       },
@@ -450,14 +465,25 @@ class _ReminderSettings extends StatelessWidget {
                     ),
                   OutlinedButton.icon(
                     onPressed: () async {
-                      if (n.permissionGranted != true && !await n.requestPermission()) return;
                       await n.showTest();
+                      if (context.mounted) showMessage(context, 'Notificación de prueba enviada');
                     },
                     icon: const Icon(Icons.send_outlined),
                     label: const Text('Probar notificación'),
                   ),
+                  TextButton.icon(
+                    onPressed: () async {
+                      await n.openSystemSettings();
+                      // Al volver, se revisa otra vez el permiso.
+                      await Future<void>.delayed(const Duration(milliseconds: 500));
+                      await n.refreshPermission();
+                    },
+                    icon: const Icon(Icons.settings_outlined),
+                    label: const Text('Abrir ajustes de notificaciones'),
+                  ),
                 ]),
               ),
+            ],
           ],
         ]),
       ),

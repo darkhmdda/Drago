@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Recursos que se usan por nombre desde Dart (notificaciones). Sin esto,
+     la reducción de recursos del APK release los elimina y el sistema de
+     notificaciones no puede iniciar. -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@drawable/ic_stat_drago,@mipmap/ic_launcher" />
