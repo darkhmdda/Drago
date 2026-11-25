@@ -187,6 +187,14 @@ void main() {
       expect(l.upcomingPayments(), isEmpty);
     });
 
+    test('Próximo pago incluye gastos programados y omite vencidos', () {
+      l.addScheduledItem(accountId: cash, amount: 15000, date: DateTime(2026, 11, 26), description: 'Comida', isIncome: false);
+      l.addDebt(name: 'DiDi', total: 20000, startDate: now, installments: [(amount: 20000, dueDate: DateTime(2026, 11, 30))]);
+      l.addScheduledItem(accountId: cash, amount: 999, date: DateTime(2026, 11, 20), description: 'Atrasado', isIncome: false);
+      expect(l.nextPaymentEvent?.title, 'Comida');
+      expect(l.nextPaymentEvent?.amount, 15000);
+    });
+
     test('Proyección del ejemplo de la especificación', () {
       l.setBalance(accountId: cash, newBalance: 50000);
       weekly400();
@@ -207,6 +215,12 @@ void main() {
       l.payInstallment(installmentId: l.installmentsOf(d.id).single.id, accountId: bank);
       expect(l.scheduledPaymentsInMonth(dec), 114900);
       expect(l.pendingPaymentsInMonth(dec), 39900);
+    });
+
+    test('Alerta de 7 días suma cuotas y gastos programados', () {
+      l.addScheduledItem(accountId: cash, amount: 15000, date: DateTime(2026, 11, 26), description: 'Comida', isIncome: false);
+      l.addDebt(name: 'DiDi', total: 20000, startDate: now, installments: [(amount: 20000, dueDate: DateTime(2026, 11, 30))]);
+      expect(l.alerts.any((a) => a.contains('próximos 7 días: \$350.00')), isTrue);
     });
 
     test('Alerta de saldo negativo proyectado', () {

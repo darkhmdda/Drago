@@ -80,31 +80,67 @@ class _TxTile extends StatelessWidget {
       TxType.adjustment => Icons.tune,
     };
     final color = t.type == TxType.transfer && focusAccount == null ? FinColors.of(context).neutral : amountColor(context, shown);
+    final amountText = t.type == TxType.transfer && focusAccount == null ? formatMoney(shown) : formatMoney(shown, signed: true);
     return Card(
       child: ListTile(
+        onTap: () => _showDetails(context, accountText, amountText, color, icon),
         leading: CircleAvatar(backgroundColor: color.withValues(alpha: 0.12), child: Icon(icon, color: color, size: 20)),
-        title: Text(t.description),
-        subtitle: Text([fmtDate(t.date), t.type.label, accountText, ?t.category].join(' · ')),
-        trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-          Text(t.type == TxType.transfer && focusAccount == null ? formatMoney(shown) : formatMoney(shown, signed: true),
-              style: TextStyle(color: color, fontWeight: FontWeight.w700)),
-          IconButton(
-            tooltip: 'Eliminar',
-            icon: const Icon(Icons.delete_outline, size: 20),
-            onPressed: () async {
-              final extra = t.type == TxType.debtPayment
-                  ? '\nLa cuota volverá a quedar pendiente.'
-                  : (t.scheduledItemId != null ? '\nEl ingreso volverá a quedar como previsto.' : '');
-              if (await confirm(context, 'Eliminar movimiento',
-                      '${t.description} · ${formatMoney(t.amount)}\nEl saldo se recalculará.$extra',
-                      action: 'Eliminar', danger: true) &&
-                  context.mounted) {
-                await runOp(context, (l) => l.deleteTransaction(t.id), success: 'Movimiento eliminado');
-              }
-            },
+        title: Text(t.description, maxLines: 1, overflow: TextOverflow.ellipsis),
+        // El tipo ya lo indica el icono: aquí solo fecha, cuenta y categoría.
+        subtitle: Text([fmtShortDate(t.date), accountText, ?t.category].join(' · '), maxLines: 2, overflow: TextOverflow.ellipsis),
+        trailing: Text(amountText, style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 15)),
+      ),
+    );
+  }
+
+  Future<void> _showDetails(BuildContext context, String accountText, String amountText, Color color, IconData icon) async {
+    final l = AppScope.of(context).ledger;
+    final delete = await showModalBottomSheet<bool>(
+      context: context,
+      showDragHandle: true,
+      builder: (c) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          ListTile(
+            leading: CircleAvatar(backgroundColor: color.withValues(alpha: 0.12), child: Icon(icon, color: color)),
+            title: Text(t.description),
+            subtitle: Text(t.type.label),
+            trailing: Text(amountText, style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 16)),
+          ),
+          const Divider(),
+          _row(c, 'Fecha', fmtDate(t.date)),
+          _row(c, t.type == TxType.transfer ? 'Cuentas' : 'Cuenta', accountText),
+          if (t.category != null) _row(c, 'Categoría', t.category!),
+          if (t.debtId != null && l.debts.any((d) => d.id == t.debtId)) _row(c, 'Deuda', l.debt(t.debtId!).name),
+          _row(c, 'Registrado', '${fmtDate(t.createdAt.toLocal())}, ${TimeOfDay.fromDateTime(t.createdAt.toLocal()).format(c)}'),
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(foregroundColor: Theme.of(c).colorScheme.error),
+              onPressed: () => Navigator.pop(c, true),
+              icon: const Icon(Icons.delete_outline),
+              label: const Text('Eliminar movimiento'),
+            ),
           ),
         ]),
       ),
     );
+    if (delete != true || !context.mounted) return;
+    final extra = t.type == TxType.debtPayment
+        ? '\nLa cuota volverá a quedar pendiente.'
+        : (t.scheduledItemId != null ? '\nVolverá a quedar como previsto en el calendario.' : '');
+    if (await confirm(context, 'Eliminar movimiento', '${t.description} · ${formatMoney(t.amount)}\nEl saldo se recalculará.$extra',
+            action: 'Eliminar', danger: true) &&
+        context.mounted) {
+      await runOp(context, (l) => l.deleteTransaction(t.id), success: 'Movimiento eliminado');
+    }
   }
+
+  Widget _row(BuildContext c, String k, String v) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          SizedBox(width: 100, child: Text(k, style: Theme.of(c).textTheme.bodySmall)),
+          Expanded(child: Text(v)),
+        ]),
+      );
 }

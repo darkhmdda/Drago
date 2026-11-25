@@ -18,7 +18,7 @@ class HomeScreen extends StatelessWidget {
     final l = AppScope.of(context).ledger;
     final now = DateTime.now();
     final month = l.monthSummary(now);
-    final next = l.nextPayment;
+    final next = l.nextPaymentEvent;
     final nextIncome = l.nextIncome;
     final alerts = l.alerts;
     final upcoming = l.upcomingPayments(limit: 5);
@@ -55,23 +55,23 @@ class HomeScreen extends StatelessWidget {
         for (final a in alerts)
           Card(
             color: theme.colorScheme.errorContainer,
-            child: ListTile(leading: const Icon(Icons.warning_amber_rounded), title: Text(a)),
+            child: ListTile(dense: true, leading: Icon(Icons.warning_amber_rounded, color: theme.colorScheme.onErrorContainer), title: Text(a, style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onErrorContainer))),
           ),
       ],
       const SectionTitle('Resumen'),
       Wrap(spacing: 8, runSpacing: 8, children: [
         _Tile(
           label: 'Próximo pago',
-          value: next == null ? 'Sin pagos' : formatMoney(l.remainingForInstallment(next.id)),
-          sub: next == null ? null : '${l.debt(next.debtId).name} · ${fmtShortDate(next.dueDate)}',
-          color: FinColors.of(context).expense,
+          value: next == null ? 'Sin pagos' : formatMoney(next.amount),
+          sub: next == null ? null : '${next.title} · ${fmtShortDate(next.date)}',
+          color: next == null ? FinColors.of(context).neutral : FinColors.of(context).expense,
           onTap: onOpenCalendar,
         ),
         _Tile(
           label: 'Próximo ingreso',
           value: nextIncome == null ? 'Sin previstos' : formatMoney(nextIncome.amount),
           sub: nextIncome == null ? null : '${nextIncome.title} · ${fmtShortDate(nextIncome.date)} (previsto)',
-          color: FinColors.of(context).income,
+          color: nextIncome == null ? FinColors.of(context).neutral : FinColors.of(context).income,
           onTap: onOpenCalendar,
         ),
         _Tile(
@@ -99,9 +99,9 @@ class HomeScreen extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(children: [
-            _row('Ingresos recibidos', month.income, FinColors.of(context).income),
-            _row('Gastos', -month.expenses, FinColors.of(context).expense),
-            _row('Pagos de deudas', -month.debtPayments, FinColors.of(context).expense),
+            _row('Ingresos recibidos', month.income, amountColor(context, month.income)),
+            _row('Gastos', -month.expenses, amountColor(context, -month.expenses)),
+            _row('Pagos de deudas', -month.debtPayments, amountColor(context, -month.debtPayments)),
             const Divider(),
             _row('Balance del mes', month.net, amountColor(context, month.net), bold: true),
             const SizedBox(height: 4),

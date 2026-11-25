@@ -56,12 +56,29 @@ class _AppShellState extends State<AppShell> {
       floatingActionButton: fab,
       bottomNavigationBar: wide
           ? null
-          : NavigationBar(
-              selectedIndex: _index,
-              onDestinationSelected: (i) => setState(() => _index = i),
-              destinations: [
-                for (final d in _destinations) NavigationDestination(icon: Icon(d.$1), selectedIcon: Icon(d.$2), label: d.$3),
-              ],
+          // Etiquetas compactas: con letra grande del sistema, «Movimientos»
+          // se partía en dos líneas.
+          : MediaQuery.withClampedTextScaling(
+              maxScaleFactor: 1.0,
+              child: NavigationBarTheme(
+                data: NavigationBarThemeData(
+                  labelTextStyle: WidgetStateProperty.resolveWith(
+                    (states) => TextStyle(
+                      fontSize: 11,
+                      letterSpacing: 0,
+                      overflow: TextOverflow.ellipsis,
+                      fontWeight: states.contains(WidgetState.selected) ? FontWeight.w700 : FontWeight.w500,
+                    ),
+                  ),
+                ),
+                child: NavigationBar(
+                  selectedIndex: _index,
+                  onDestinationSelected: (i) => setState(() => _index = i),
+                  destinations: [
+                    for (final d in _destinations) NavigationDestination(icon: Icon(d.$1), selectedIcon: Icon(d.$2), label: d.$3),
+                  ],
+                ),
+              ),
             ),
       body: wide
           ? Row(children: [

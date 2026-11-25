@@ -969,6 +969,15 @@ class Ledger {
     return null;
   }
 
+  /// Próximo pago que aún no vence: cuota o gasto programado (los vencidos
+  /// se muestran como alerta aparte).
+  CalendarEvent? get nextPaymentEvent {
+    for (final e in agenda()) {
+      if (!e.isIncome && !e.overdue) return e;
+    }
+    return null;
+  }
+
   /// Próximos pagos (cuotas y gastos previstos), incluidos los vencidos.
   List<CalendarEvent> upcomingPayments({int limit = 5, int days = 60}) =>
       agenda(days: days).where((e) => !e.isIncome).take(limit).toList();
@@ -1005,10 +1014,16 @@ class Ledger {
       final sum = overdue.fold<int>(0, (s, i) => s + remainingForInstallment(i.id));
       out.add('Tienes ${overdue.length} cuota(s) vencida(s) por ${formatMoney(sum)}.');
     }
+    // Pagos de los próximos 7 días: cuotas y gastos programados.
     final weekLimit = today.add(const Duration(days: 7));
-    final week = openInstallments.where((i) => !i.dueDate.isBefore(today) && !i.dueDate.isAfter(weekLimit)).toList();
+    final week = agenda(days: 7).where((e) => !e.isIncome && !e.overdue && !e.date.isAfter(weekLimit)).toList();
+    final overdueExpenses = agenda(days: 0).where((e) => !e.isIncome && e.overdue && e.kind == EventKind.expense);
+    if (overdueExpenses.isNotEmpty) {
+      final sum = overdueExpenses.fold<int>(0, (s, e) => s + e.amount);
+      out.add('Tienes ${overdueExpenses.length} gasto(s) programado(s) sin confirmar por ${formatMoney(sum)}.');
+    }
     if (week.isNotEmpty) {
-      final sum = week.fold<int>(0, (s, i) => s + remainingForInstallment(i.id));
+      final sum = week.fold<int>(0, (s, e) => s + e.amount);
       out.add('Pagos en los próximos 7 días: ${formatMoney(sum)}.');
       final needed = sum + overdue.fold<int>(0, (s, i) => s + remainingForInstallment(i.id));
       if (needed > totalAvailable) {
