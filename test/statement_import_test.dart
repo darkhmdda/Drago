@@ -239,13 +239,13 @@ Abono mensual 72
       expect(a.totalPending, 307900);
       expect(a.info.single!.payoff, 247800);
       expect(a.payments.length, 7);
-      expect(a.payments.first.date, DateTime(2026, 12, 21));
+      expect(a.payments.first.date, DateTime(2026, 12, 23)); // día de la compra
       expect(a.payments.first.amount, 44000);
       expect(a.payments.last.amount, 307900 - 44000 * 6);
       expect(b.institution, 'Audifono');
       expect(b.totalPending, 71600);
       expect(b.payments.length, 10);
-      expect(b.payments.first.date, DateTime(2026, 12, 1));
+      expect(b.payments.first.date, DateTime(2026, 12, 6));
       expect(b.payments.last.amount, 71600 - 7200 * 9);
     });
 
@@ -301,14 +301,18 @@ Abono mensual 72
     final s = parseStatement(text, today: DateTime(2026, 11, 25));
     expect(s.groups.length, 2);
     final a = s.forGroup(0), b = s.forGroup(1);
-    expect(a.institution, 'Att unefon baña');
+    expect(a.institution, 'Att unefon');
     expect(a.totalPending, 307900);
     expect(a.info.single!.payment, 44000);
     expect(a.info.single!.lastPayment, DateTime(2026, 11, 21));
-    expect(a.payments.first.date, DateTime(2026, 12, 21));
+    // El día de pago es el de la compra (23), no el del último abono.
+    expect(a.info.single!.paymentDay, 23);
+    expect(a.payments.first.date, DateTime(2026, 12, 23));
+    expect(a.payments[1].date, DateTime(2027, 1, 23));
     expect(b.institution, 'Audifono');
     expect(b.totalPending, 71600);
     expect(b.info.single!.payment, 7200);
-    expect(b.payments.first.date, DateTime(2026, 12, 1));
+    expect(b.info.single!.paymentDay, 6);
+    expect(b.payments.first.date, DateTime(2026, 12, 6));
   });
 }

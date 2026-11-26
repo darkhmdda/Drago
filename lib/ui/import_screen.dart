@@ -358,7 +358,8 @@ class _ImportScreenState extends State<ImportScreen> {
   }
 
   /// Día de pago de una deuda de abono mensual: el del siguiente pago calculado.
-  int _dayOf(ParsedStatement p) => p.payments.isEmpty ? (p.info.first?.lastPayment?.day ?? 1) : p.payments.first.date.day;
+  int _dayOf(ParsedStatement p) =>
+      p.info.first?.paymentDay ?? (p.payments.isEmpty ? (p.info.first?.lastPayment?.day ?? 1) : p.payments.first.date.day);
 
   Widget _row(String label, String before, String after, {bool changed = true}) => ListTile(
         dense: true,

@@ -30,11 +30,15 @@ class BlockInfo {
   final Cents? payment;
   final String? frequency;
   final DateTime? lastPayment;
+  final DateTime? purchaseDate;
+
+  /// Día del mes en que toca pagar (el de la fecha de compra).
+  final int? paymentDay;
 
   /// Las fechas e importes se calcularon a partir del abono (la captura no
   /// trae el calendario de pagos).
   final bool estimated;
-  const BlockInfo({this.name, this.total, this.payoff, this.payment, this.frequency, this.lastPayment, this.estimated = false});
+  const BlockInfo({this.name, this.total, this.payoff, this.payment, this.frequency, this.lastPayment, this.purchaseDate, this.paymentDay, this.estimated = false});
 }
 
 /// Lo que se pudo leer de una captura de estado de cuenta.
@@ -492,11 +496,28 @@ class _Card {
 }
 
 /// El nombre como se ve en la captura, sin el ruido de iconos ni el importe pegado.
-String _cleanName(String raw) => raw
-    .replaceFirst(RegExp(r'\s*(\$|MXN|mxn).*$'), '')
-    .replaceFirst(RegExp(r'^(?:[^A-Za-zÁÉÍÓÚÑáéíóúñ0-9]+|[A-Za-z] (?=[A-Za-zÁÉÍÓÚÑáéíóúñ]{2}))+'), '')
-    .replaceFirst(RegExp(r'[^A-Za-zÁÉÍÓÚÑáéíóúñ0-9]+$'), '')
-    .trim();
+String _cleanName(String raw) {
+  var n = raw
+      .replaceFirst(RegExp(r'\s*(\$|MXN|mxn).*$'), '')
+      .replaceFirst(RegExp(r'^(?:[^A-Za-zÁÉÍÓÚÑáéíóúñ0-9]+|[A-Za-z] (?=[A-Za-zÁÉÍÓÚÑáéíóúñ]{2}))+'), '')
+      .replaceFirst(RegExp(r'[^A-Za-zÁÉÍÓÚÑáéíóúñ0-9]+$'), '')
+      .trim();
+  // El importe de al lado del nombre a veces se lee como una palabra corta
+  // rara («$ 440» → «baña»): se quita si parece basura del lector.
+  final words = n.split(' ');
+  if (words.length >= 2) {
+    final w = words.last;
+    final junk = w.length <= 5 &&
+        (RegExp(r'[ñÑ$§¢£€\d|]').hasMatch(w) || !RegExp(r'[aeiouáéíóúAEIOUÁÉÍÓÚ]').hasMatch(w) || RegExp(r'^[a-zñ]{1,2}$').hasMatch(w));
+    if (junk) n = words.sublist(0, words.length - 1).join(' ');
+  }
+  return n;
+}
+
+DateTime _onDay(int y, int m, int day) {
+  final last = DateTime(y, m + 1, 0).day;
+  return DateTime(y, m, day > last ? last : day);
+}
 
 DateTime _addPeriod(DateTime d, String? freq, int n) {
   switch (freq) {
@@ -597,13 +618,34 @@ ParsedStatement? _parseSummary(List<String> rawLines, DateTime today) {
     if (total == null || pay == null || pay <= 0) continue;
     final last = c.values[_Key.last] as DateTime?;
     final next = c.values[_Key.next] as DateTime?;
-    var first = next ?? (last != null ? _addPeriod(last, c.freq, 1) : _addPeriod(today, c.freq, 1));
+    final purchase = c.values[_Key.purchase] as DateTime?;
+    final monthly = c.freq == null || c.freq == 'mensual';
     var n = (total + pay - 1) ~/ pay;
     if (n > 120) n = 120;
+    final dates = <DateTime>[];
+    if (next == null && monthly && (purchase != null || last != null)) {
+      // El día de pago es el de la fecha de compra (si no hay, el del último abono).
+      final day = (purchase ?? last)!.day;
+      final yesterday = today.subtract(const Duration(days: 1));
+      // Primer vencimiento que no esté cubierto por el último abono (un abono
+      // hecho hasta ~20 días antes cuenta para ese mes) y que no haya pasado.
+      var d = _onDay(yesterday.year, yesterday.month, day);
+      while (!d.isAfter(yesterday) || (last != null && d.difference(last).inDays < 20)) {
+        d = _onDay(d.year, d.month + 1, day);
+      }
+      for (var k = 0; k < n; k++) {
+        dates.add(_onDay(d.year, d.month + k, day));
+      }
+    } else {
+      final first = next ?? (last != null ? _addPeriod(last, c.freq, 1) : _addPeriod(today, c.freq, 1));
+      for (var k = 0; k < n; k++) {
+        dates.add(_addPeriod(first, c.freq, k));
+      }
+    }
     final list = <DetectedPayment>[];
     for (var k = 0; k < n; k++) {
       final amount = k == n - 1 ? total - pay * (n - 1) : pay;
-      list.add(DetectedPayment(_addPeriod(first, c.freq, k), amount, 'Estimado: abono ${c.freq ?? ''} de ${formatMoney(pay)}', number: k + 1, of: n));
+      list.add(DetectedPayment(dates[k], amount, 'Estimado: abono ${c.freq ?? ''} de ${formatMoney(pay)}', number: k + 1, of: n));
     }
     groups.add(list);
     info.add(BlockInfo(
@@ -613,6 +655,8 @@ ParsedStatement? _parseSummary(List<String> rawLines, DateTime today) {
       payment: pay,
       frequency: c.freq,
       lastPayment: last,
+      purchaseDate: purchase,
+      paymentDay: next == null && monthly && (purchase != null || last != null) ? (purchase ?? last)!.day : null,
       estimated: true,
     ));
   }
