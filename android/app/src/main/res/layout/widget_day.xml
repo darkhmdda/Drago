@@ -7,12 +7,26 @@
     android:gravity="center"
     android:orientation="vertical">
 
-    <TextView
-        android:id="@+id/day"
+    <!-- Número del día; los días que ya pasaron se tachan con una ✕. -->
+    <FrameLayout
         android:layout_width="21dp"
-        android:layout_height="21dp"
-        android:gravity="center"
-        android:textSize="11sp" />
+        android:layout_height="21dp">
+        <TextView
+            android:id="@+id/day"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:textSize="11sp" />
+        <TextView
+            android:id="@+id/cross"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:text="✕"
+            android:textSize="19sp"
+            android:visibility="gone" />
+    </FrameLayout>
 
     <!-- Puntos de color: ingreso y pago (pendiente o vencido). -->
     <LinearLayout

@@ -265,6 +265,11 @@ class DragoCalendarWidget : HomeWidgetProvider() {
                         } else {
                             cell.setInt(R.id.day, "setBackgroundColor", colors.primary)
                         }
+                    } else if (key < todayKey) {
+                        // Día que ya pasó: tachado con una ✕, como en las series.
+                        cell.setTextColor(R.id.day, colors.muted)
+                        cell.setViewVisibility(R.id.cross, View.VISIBLE)
+                        cell.setTextColor(R.id.cross, (colors.expense and 0x00FFFFFF) or (0xB0 shl 24))
                     } else {
                         cell.setTextColor(R.id.day, colors.text)
                     }
