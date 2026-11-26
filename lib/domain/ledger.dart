@@ -389,6 +389,8 @@ class Ledger {
     required DateTime startDate,
     String description = '',
     List<({Cents amount, DateTime dueDate})> installments = const [],
+    Cents? monthlyPayment,
+    int? paymentDay,
   }) {
     final n = name.trim();
     if (n.isEmpty) throw FinanceException('La deuda necesita un nombre.');
@@ -396,8 +398,22 @@ class Ledger {
     for (final i in installments) {
       if (i.amount <= 0) throw FinanceException('Cada cuota debe tener un importe mayor que cero.');
     }
-    final d = Debt(id: _id(), name: n, total: total, startDate: dayOf(startDate), description: description.trim());
+    if (monthlyPayment != null) _checkMonthly(monthlyPayment, paymentDay);
+    final d = Debt(
+      id: _id(),
+      name: n,
+      total: total,
+      startDate: dayOf(startDate),
+      description: description.trim(),
+      monthlyPayment: monthlyPayment,
+      paymentDay: monthlyPayment == null ? null : paymentDay,
+    );
     debts.add(d);
+    if (d.isMonthly) {
+      rebuildMonthlySchedule(d.id);
+      _audit('Deuda creada', '$n: ${formatMoney(total)}, abono mensual de ${formatMoney(monthlyPayment!)} el día $paymentDay');
+      return d;
+    }
     final sorted = [...installments]..sort((a, b) => a.dueDate.compareTo(b.dueDate));
     for (var k = 0; k < sorted.length; k++) {
       this.installments.add(Installment(
@@ -407,19 +423,33 @@ class Ledger {
     return d;
   }
 
-  void updateDebt(String id, {String? name, Cents? total, DateTime? startDate, String? description}) {
+  /// [monthlyPayment] y [paymentDay] convierten la deuda en «abono mensual»
+  /// (o la ajustan); [clearMonthly] la regresa a cuotas fijas (las cuotas
+  /// que ya tiene se conservan).
+  void updateDebt(String id,
+      {String? name, Cents? total, DateTime? startDate, String? description, Cents? monthlyPayment, int? paymentDay, bool clearMonthly = false}) {
     final d = debt(id);
     if (name != null && name.trim().isEmpty) throw FinanceException('La deuda necesita un nombre.');
     if (total != null) _requirePositive(total);
-    debts[debts.indexOf(d)] = d.copyWith(
+    if (monthlyPayment != null || paymentDay != null) _checkMonthly(monthlyPayment ?? d.monthlyPayment, paymentDay ?? d.paymentDay);
+    final updated = d.copyWith(
       name: name?.trim(),
       total: total,
       startDate: startDate == null ? null : dayOf(startDate),
       description: description?.trim(),
+      monthlyPayment: monthlyPayment,
+      paymentDay: paymentDay,
+      clearMonthly: clearMonthly,
     );
+    debts[debts.indexOf(d)] = updated;
+    if (updated.isMonthly) rebuildMonthlySchedule(id);
     final changes = <String>[
       if (name != null && name.trim() != d.name) 'nombre: ${d.name} → ${name.trim()}',
       if (total != null && total != d.total) 'monto: ${formatMoney(d.total)} → ${formatMoney(total)}',
+      if (updated.monthlyPayment != d.monthlyPayment && updated.monthlyPayment != null)
+        'abono mensual: ${formatMoney(updated.monthlyPayment!)}',
+      if (updated.paymentDay != d.paymentDay && updated.paymentDay != null) 'día de pago: ${updated.paymentDay}',
+      if (clearMonthly && d.isMonthly) 'ahora con cuotas fijas',
     ];
     _audit('Deuda editada', '${d.name}${changes.isEmpty ? '' : ' (${changes.join(', ')})'}');
   }
@@ -450,6 +480,40 @@ class Ledger {
 
   List<Installment> installmentsOf(String debtId) =>
       installments.where((i) => i.debtId == debtId).toList()..sort((a, b) => a.dueDate.compareTo(b.dueDate));
+
+  void _checkMonthly(Cents? payment, int? day) {
+    if (payment == null || payment <= 0) throw FinanceException('El abono mensual debe ser mayor que cero.');
+    if (day == null || day < 1 || day > 31) throw FinanceException('El día de pago debe estar entre 1 y 31.');
+  }
+
+  /// Recalcula las cuotas de una deuda de «abono mensual»: conserva las que
+  /// ya tienen pagos, las vencidas y las canceladas, y reparte el resto del
+  /// saldo en abonos mensuales el día de pago (el último, por lo que falte).
+  void rebuildMonthlySchedule(String debtId) {
+    final d = debt(debtId);
+    if (!d.isMonthly) return;
+    installments.removeWhere((i) =>
+        i.debtId == debtId && !i.cancelled && paidForInstallment(i.id) == 0 && !i.dueDate.isBefore(today));
+    final kept = installmentsOf(debtId).where((i) => !i.cancelled).toList();
+    var left = d.total - kept.fold<int>(0, (s, i) => s + i.amount);
+    var after = today.subtract(const Duration(days: 1));
+    if (kept.isNotEmpty && kept.last.dueDate.isAfter(after)) after = kept.last.dueDate;
+    DateTime onDay(int y, int m) {
+      final last = DateTime(y, m + 1, 0).day;
+      return DateTime(y, m, d.paymentDay! > last ? last : d.paymentDay!);
+    }
+
+    var date = onDay(after.year, after.month);
+    if (!date.isAfter(after)) date = onDay(after.year, after.month + 1);
+    for (var k = 0; left > 0 && k < 240; k++) {
+      final amount = left < d.monthlyPayment! ? left : d.monthlyPayment!;
+      installments.add(Installment(id: _id(), debtId: debtId, number: 0, amount: amount, dueDate: date));
+      left -= amount;
+      date = onDay(date.year, date.month + 1);
+    }
+    _renumber(debtId);
+    _refreshDebtStatus(debtId);
+  }
 
   void _renumber(String debtId) {
     final list = installmentsOf(debtId);

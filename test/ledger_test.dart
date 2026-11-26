@@ -207,6 +207,36 @@ void main() {
       expect(formatMoney(5), '\$0.05');
     });
   });
+
+  group('Deudas de abono mensual', () {
+    test('Calcula los pagos el día indicado hasta cubrir el saldo', () {
+      l.setBalance(accountId: cash, newBalance: 100000);
+      final d = l.addDebt(name: 'Att unefon', total: 307900, startDate: now, monthlyPayment: 44000, paymentDay: 21);
+      final insts = l.installmentsOf(d.id);
+      expect(insts.length, 7);
+      expect(insts.first.dueDate, DateTime(2026, 12, 21));
+      expect(insts[1].dueDate, DateTime(2027, 1, 21));
+      expect(insts.last.amount, 307900 - 44000 * 6);
+      expect(l.summaryOf(d.id).hasMismatch, isFalse);
+
+      // Paga el primero y luego la tienda cambia el saldo y el abono.
+      l.payInstallment(installmentId: insts.first.id, accountId: cash);
+      l.updateDebt(d.id, total: 44000 + 200000, monthlyPayment: 50000, paymentDay: 5);
+      final after = l.installmentsOf(d.id);
+      expect(after.first.id, insts.first.id); // el pagado se conserva
+      expect(after.skip(1).map((i) => i.amount), [50000, 50000, 50000, 50000]);
+      expect(after[1].dueDate, DateTime(2027, 1, 5));
+      expect(l.summaryOf(d.id).remaining, 200000);
+    });
+
+    test('Día 31 en meses cortos y se guarda en JSON', () {
+      final d = l.addDebt(name: 'Tienda', total: 30000, startDate: now, monthlyPayment: 10000, paymentDay: 31);
+      expect(l.installmentsOf(d.id).map((i) => i.dueDate), [DateTime(2026, 11, 30), DateTime(2026, 12, 31), DateTime(2027, 1, 31)]);
+      final back = Ledger.fromJson(jsonDecode(jsonEncode(l.toJson())), clock: () => now);
+      expect(back.debt(d.id).isMonthly, isTrue);
+      expect(back.debt(d.id).paymentDay, 31);
+    });
+  });
 }
 
 Debt _didi(Ledger l) => l.addDebt(

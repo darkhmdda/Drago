@@ -72,6 +72,8 @@ class _DebtCard extends StatelessWidget {
             LinearProgressIndicator(value: progress, minHeight: 6, borderRadius: BorderRadius.circular(4)),
             const SizedBox(height: 8),
             Text('Pagado ${formatMoney(summary.paid)} de ${formatMoney(summary.original)} · pendiente ${formatMoney(summary.remaining)}'),
+            if (d.isMonthly)
+              Text('Abono mensual de ${formatMoney(d.monthlyPayment!)} el día ${d.paymentDay}', style: Theme.of(context).textTheme.bodySmall),
             if (next.isNotEmpty)
               Text('Próxima cuota: ${formatMoney(l.remainingForInstallment(next.first.id))} · ${fmtDate(next.first.dueDate)}',
                   style: Theme.of(context).textTheme.bodySmall),
@@ -129,6 +131,7 @@ class DebtDetailScreen extends StatelessWidget {
               _kv('Saldo pendiente', formatMoney(s.remaining), color: FinColors.of(context).expense, bold: true),
               const Divider(),
               _kv('Suma de cuotas pendientes', formatMoney(s.pendingInstallments)),
+              if (d.isMonthly) _kv('Abono mensual', '${formatMoney(d.monthlyPayment!)} el día ${d.paymentDay}'),
               _kv('Inicio', fmtDate(d.startDate)),
               _kv('Estado', d.status.label),
               if (d.description.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 8), child: Text(d.description)),
@@ -288,6 +291,10 @@ class _DebtFormState extends State<_DebtForm> {
   late final _total = TextEditingController(text: widget.existing == null ? '' : centsToInput(widget.existing!.total));
   late final _desc = TextEditingController(text: widget.existing?.description ?? '');
   late DateTime _start = widget.existing?.startDate ?? DateTime.now();
+  late bool _monthly = widget.existing?.isMonthly ?? false;
+  late final _payment =
+      TextEditingController(text: widget.existing?.monthlyPayment == null ? '' : centsToInput(widget.existing!.monthlyPayment!));
+  late final _day = TextEditingController(text: '${widget.existing?.paymentDay ?? DateTime.now().day}');
   final List<_InstRow> _rows = [];
 
   bool get _editing => widget.existing != null;
@@ -318,12 +325,44 @@ class _DebtFormState extends State<_DebtForm> {
             validator: (v) => (v ?? '').trim().isEmpty ? 'Escribe un nombre' : null,
           ),
           gap,
-          MoneyField(controller: _total, label: 'Monto total a pagar'),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            value: _monthly,
+            onChanged: (v) => setState(() => _monthly = v),
+            title: const Text('Abono mensual (sin número fijo de cuotas)'),
+            subtitle: const Text('Para tiendas o créditos donde pagas un abono cierto día de cada mes hasta liquidar.'),
+          ),
           gap,
+          MoneyField(controller: _total, label: _monthly && !_editing ? 'Saldo que debes' : 'Monto total a pagar'),
+          gap,
+          if (_monthly) ...[
+            Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Expanded(flex: 3, child: MoneyField(controller: _payment, label: 'Abono mensual')),
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 2,
+                child: TextFormField(
+                  controller: _day,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Día de pago', hintText: '1 a 31', border: OutlineInputBorder()),
+                  validator: (v) {
+                    final n = int.tryParse((v ?? '').trim());
+                    return n == null || n < 1 || n > 31 ? 'Del 1 al 31' : null;
+                  },
+                ),
+              ),
+            ]),
+            const Padding(
+              padding: EdgeInsets.only(top: 6),
+              child: Text('Drago calcula solo los pagos que faltan hasta cubrir el saldo, y los recalcula si cambias el saldo o el abono.',
+                  style: TextStyle(fontSize: 13)),
+            ),
+            gap,
+          ],
           DateField(label: 'Fecha de inicio', value: _start, onChanged: (d) => setState(() => _start = d)),
           gap,
           TextFormField(controller: _desc, maxLines: 2, decoration: const InputDecoration(labelText: 'Descripción', border: OutlineInputBorder())),
-          if (!_editing) ...[
+          if (!_editing && !_monthly) ...[
             SectionTitle('Cuotas',
                 trailing: TextButton.icon(onPressed: _addRow, icon: const Icon(Icons.add), label: const Text('Agregar cuota'))),
             const Text('Cada cuota puede tener un importe y una fecha diferentes.', style: TextStyle(fontSize: 13)),
@@ -365,16 +404,31 @@ class _DebtFormState extends State<_DebtForm> {
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     final total = parseMoney(_total.text)!;
+    final payment = _monthly ? parseMoney(_payment.text) : null;
+    final day = _monthly ? int.tryParse(_day.text.trim()) : null;
+    if (_monthly && (payment == null || payment <= 0)) {
+      showMessage(context, 'Escribe el abono mensual.');
+      return;
+    }
     final ok = await runOp(context, (l) {
       if (_editing) {
-        l.updateDebt(widget.existing!.id, name: _name.text, total: total, startDate: _start, description: _desc.text);
+        l.updateDebt(widget.existing!.id,
+            name: _name.text,
+            total: total,
+            startDate: _start,
+            description: _desc.text,
+            monthlyPayment: payment,
+            paymentDay: day,
+            clearMonthly: !_monthly && widget.existing!.isMonthly);
       } else {
         l.addDebt(
           name: _name.text,
           total: total,
           startDate: _start,
           description: _desc.text,
-          installments: [for (final r in _rows) (amount: parseMoney(r.amount.text)!, dueDate: r.date)],
+          installments: _monthly ? const [] : [for (final r in _rows) (amount: parseMoney(r.amount.text)!, dueDate: r.date)],
+          monthlyPayment: payment,
+          paymentDay: day,
         );
       }
     }, success: _editing ? 'Deuda actualizada' : 'Deuda registrada');

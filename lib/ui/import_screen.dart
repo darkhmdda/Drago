@@ -246,8 +246,8 @@ class _ImportScreenState extends State<ImportScreen> {
                   ListTile(
                     dense: true,
                     leading: const Icon(Icons.info_outline),
-                    title: Text('La captura no trae el calendario: calculé ${p.payments.length} pago(s) a partir del abono'
-                        '${info!.lastPayment != null ? ' y el último abono' : ''}. Si la deuda ya existe, se conservan tus fechas y solo se ajustan importes.'),
+                    title: const Text('Es una deuda de abono mensual: no tiene un número fijo de cuotas. Drago guarda el saldo, '
+                        'el abono y el día de pago, y calcula solo los pagos que faltan.'),
                   ),
               ]),
             ),
@@ -267,7 +267,10 @@ class _ImportScreenState extends State<ImportScreen> {
                 _resetSelection();
               }),
             ),
-            if (_debtId == _newDebt) ..._newDebtSection(p) else if (_debtId != null) ..._compareSection(l, p),
+            if (_debtId == _newDebt)
+              ...(p.estimated ? _newMonthlySection(p) : _newDebtSection(p))
+            else if (_debtId != null)
+              ...(p.estimated ? _monthlySection(l, p) : _compareSection(l, p)),
           ],
           ExpansionTile(
             tilePadding: EdgeInsets.zero,
@@ -351,6 +354,114 @@ class _ImportScreenState extends State<ImportScreen> {
       ),
       const SizedBox(height: 4),
       const Text('No se borra ninguna cuota y nada cambia hasta que confirmes.', style: TextStyle(fontSize: 12)),
+    ];
+  }
+
+  /// Día de pago de una deuda de abono mensual: el del siguiente pago calculado.
+  int _dayOf(ParsedStatement p) => p.payments.isEmpty ? (p.info.first?.lastPayment?.day ?? 1) : p.payments.first.date.day;
+
+  Widget _row(String label, String before, String after, {bool changed = true}) => ListTile(
+        dense: true,
+        title: Text(label),
+        trailing: Text.rich(TextSpan(children: [
+          if (changed) TextSpan(text: '$before  →  ', style: const TextStyle(decoration: TextDecoration.lineThrough)),
+          TextSpan(text: after, style: const TextStyle(fontWeight: FontWeight.w700)),
+        ])),
+      );
+
+  List<Widget> _schedulePreview(ParsedStatement p) => [
+        const SizedBox(height: 4),
+        Text(
+          'Próximos pagos: ${p.payments.take(3).map((x) => '${fmtShortDate(x.date)} ${formatMoney(x.amount)}').join(' · ')}'
+          '${p.payments.length > 3 ? ' … (${p.payments.length} en total hasta cubrir el saldo)' : ''}',
+          style: const TextStyle(fontSize: 12),
+        ),
+      ];
+
+  /// Deuda de abono mensual: se actualizan saldo, abono y día de pago, y la
+  /// app recalcula sola los pagos que faltan.
+  List<Widget> _monthlySection(Ledger l, ParsedStatement p) {
+    final debt = l.debt(_debtId!);
+    final summary = l.summaryOf(debt.id);
+    final info = p.info.first!;
+    final day = _dayOf(p);
+    final newTotal = summary.paid + info.total!;
+    final same = debt.isMonthly && debt.monthlyPayment == info.payment && debt.paymentDay == day && summary.remaining == info.total;
+    return [
+      const SectionTitle('Cambios propuestos'),
+      Card(
+        child: Column(children: [
+          _row('Saldo pendiente', formatMoney(summary.remaining), formatMoney(info.total!), changed: summary.remaining != info.total),
+          _row('Abono mensual', debt.isMonthly ? formatMoney(debt.monthlyPayment!) : 'cuotas fijas', formatMoney(info.payment!),
+              changed: debt.monthlyPayment != info.payment),
+          _row('Día de pago', debt.isMonthly ? 'día ${debt.paymentDay}' : '—', 'día $day', changed: debt.paymentDay != day),
+        ]),
+      ),
+      ..._schedulePreview(p),
+      gap,
+      FilledButton.icon(
+        onPressed: same
+            ? null
+            : () async {
+                final ok = await confirm(
+                    context,
+                    'Actualizar deuda',
+                    '«${debt.name}» quedará como abono mensual de ${formatMoney(info.payment!)} el día $day, con saldo de '
+                        '${formatMoney(info.total!)}. Se recalculan los pagos futuros sin abonos; los pagos ya registrados no cambian.',
+                    action: 'Actualizar');
+                if (!ok || !mounted) return;
+                final id = debt.id;
+                final done = await runOp(context, (l) => l.updateDebt(id, total: newTotal, monthlyPayment: info.payment, paymentDay: day),
+                    success: 'Deuda actualizada');
+                if (done && mounted) _blockDone();
+              },
+        icon: const Icon(Icons.check),
+        label: Text(same ? 'Ya está al día' : 'Actualizar deuda'),
+      ),
+    ];
+  }
+
+  List<Widget> _newMonthlySection(ParsedStatement p) {
+    final info = p.info.first!;
+    final day = _dayOf(p);
+    return [
+      gap,
+      TextField(controller: _newName, decoration: const InputDecoration(labelText: 'Nombre de la deuda', border: OutlineInputBorder())),
+      gap,
+      Card(
+        child: Column(children: [
+          _row('Saldo que debes', '', formatMoney(info.total!), changed: false),
+          _row('Abono mensual', '', formatMoney(info.payment!), changed: false),
+          _row('Día de pago', '', 'día $day de cada mes', changed: false),
+        ]),
+      ),
+      ..._schedulePreview(p),
+      gap,
+      FilledButton.icon(
+        onPressed: () async {
+          final name = _newName.text.trim().isEmpty ? (p.institution ?? 'Deuda importada') : _newName.text.trim();
+          if (!await confirm(context, 'Crear deuda', '«$name»: saldo ${formatMoney(info.total!)}, abono mensual de '
+                  '${formatMoney(info.payment!)} el día $day.') ||
+              !mounted) {
+            return;
+          }
+          final ok = await runOp(
+            context,
+            (l) => l.addDebt(
+              name: name,
+              total: info.total!,
+              startDate: l.today,
+              description: 'Importada desde captura',
+              monthlyPayment: info.payment,
+              paymentDay: day,
+            ),
+            success: 'Deuda creada',
+          );
+          if (ok && mounted) _blockDone();
+        },
+        icon: const Icon(Icons.add),
+        label: const Text('Crear deuda'),
+      ),
     ];
   }
 

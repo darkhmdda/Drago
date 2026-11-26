@@ -163,6 +163,12 @@ class Debt {
   final String description;
   final DebtStatus status;
 
+  /// Deudas de «abono mensual» (tiendas, crédito revolvente): no tienen un
+  /// número fijo de cuotas, sino un abono que se paga cierto día de cada mes
+  /// hasta cubrir el saldo. Las cuotas se calculan solas a partir de aquí.
+  final Cents? monthlyPayment;
+  final int? paymentDay;
+
   const Debt({
     required this.id,
     required this.name,
@@ -170,15 +176,31 @@ class Debt {
     required this.startDate,
     this.description = '',
     this.status = DebtStatus.active,
+    this.monthlyPayment,
+    this.paymentDay,
   });
 
-  Debt copyWith({String? name, Cents? total, DateTime? startDate, String? description, DebtStatus? status}) => Debt(
+  bool get isMonthly => monthlyPayment != null && paymentDay != null;
+
+  Debt copyWith({
+    String? name,
+    Cents? total,
+    DateTime? startDate,
+    String? description,
+    DebtStatus? status,
+    Cents? monthlyPayment,
+    int? paymentDay,
+    bool clearMonthly = false,
+  }) =>
+      Debt(
         id: id,
         name: name ?? this.name,
         total: total ?? this.total,
         startDate: startDate ?? this.startDate,
         description: description ?? this.description,
         status: status ?? this.status,
+        monthlyPayment: clearMonthly ? null : monthlyPayment ?? this.monthlyPayment,
+        paymentDay: clearMonthly ? null : paymentDay ?? this.paymentDay,
       );
 
   Map<String, dynamic> toJson() => {
@@ -188,6 +210,8 @@ class Debt {
         'startDate': _d(startDate),
         'description': description,
         'status': status.name,
+        if (monthlyPayment != null) 'monthlyPayment': monthlyPayment,
+        if (paymentDay != null) 'paymentDay': paymentDay,
       };
 
   factory Debt.fromJson(Map<String, dynamic> j) => Debt(
@@ -197,6 +221,8 @@ class Debt {
         startDate: _p(j['startDate']),
         description: j['description'] ?? '',
         status: DebtStatus.values.byName(j['status']),
+        monthlyPayment: j['monthlyPayment'],
+        paymentDay: j['paymentDay'],
       );
 }
 
