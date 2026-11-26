@@ -17,6 +17,26 @@ class DetectedPayment {
   const DetectedPayment(this.date, this.amount, this.line, {this.number, this.of});
 }
 
+/// Datos de una deuda leídos de un resumen tipo «Estado de cuenta»
+/// (nombre, «Debes», «Abono mensual», «Último abono»…).
+class BlockInfo {
+  final String? name;
+  final Cents? total;
+
+  /// «Liquidas hoy con»: lo que costaría liquidarla hoy.
+  final Cents? payoff;
+
+  /// Abono periódico y su periodicidad (mensual, quincenal…).
+  final Cents? payment;
+  final String? frequency;
+  final DateTime? lastPayment;
+
+  /// Las fechas e importes se calcularon a partir del abono (la captura no
+  /// trae el calendario de pagos).
+  final bool estimated;
+  const BlockInfo({this.name, this.total, this.payoff, this.payment, this.frequency, this.lastPayment, this.estimated = false});
+}
+
 /// Lo que se pudo leer de una captura de estado de cuenta.
 class ParsedStatement {
   final String? institution;
@@ -26,17 +46,31 @@ class ParsedStatement {
   /// cuando la numeración de cuotas vuelve a empezar («6 de 6» → «3 de 6»).
   final List<List<DetectedPayment>> groups;
 
+  /// Datos de cada bloque (mismo orden que [groups]), si la captura los trae.
+  final List<BlockInfo?> info;
+
   /// Saldo o total pendiente que menciona la captura, si lo hay.
   final Cents? totalPending;
-  const ParsedStatement({this.institution, this.groups = const [], this.totalPending});
+  const ParsedStatement({this.institution, this.groups = const [], this.totalPending, this.info = const []});
 
   /// Todos los pagos detectados (de todos los bloques).
   List<DetectedPayment> get payments => [for (final g in groups) ...g];
   bool get isEmpty => groups.every((g) => g.isEmpty) && totalPending == null;
 
-  /// Solo un bloque (el total pendiente aplica únicamente si hay un solo bloque).
-  ParsedStatement forGroup(int i) =>
-      ParsedStatement(institution: institution, groups: [groups[i]], totalPending: groups.length == 1 ? totalPending : null);
+  BlockInfo? infoOf(int i) => i < info.length ? info[i] : null;
+
+  /// Solo un bloque (el total pendiente general aplica únicamente si hay un solo bloque).
+  ParsedStatement forGroup(int i) {
+    final b = infoOf(i);
+    return ParsedStatement(
+      institution: b?.name ?? institution,
+      groups: [groups[i]],
+      totalPending: b?.total ?? (groups.length == 1 ? totalPending : null),
+      info: [b],
+    );
+  }
+
+  bool get estimated => info.isNotEmpty && info.every((b) => b?.estimated ?? false);
 }
 
 const _monthNames = {
@@ -266,7 +300,9 @@ class _Line {
 /// en columnas separadas. Ignora cuotas marcadas como pagadas y separa varias
 /// deudas en bloques.
 ParsedStatement parseStatement(String text, {required DateTime today, List<String> extraNames = const []}) {
-  final rawLines = text.split(RegExp(r'\r?\n'));
+  final rawLines = _joinSplitDates(text.split(RegExp(r'\r?\n')));
+  final summary = _parseSummary(rawLines, today);
+  if (summary != null) return summary;
   final lines = <_Line>[];
   final boundaryBefore = <int>{}; // índices de líneas precedidas por un separador
   var blanks = 0;
@@ -312,8 +348,13 @@ ParsedStatement parseStatement(String text, {required DateTime today, List<Strin
   }
 
   // Número de cuota: de la línea o de una línea vecina sin fecha («Cuota 2 de 6» arriba).
+  // ¿El «2 de 6» va arriba o abajo de cada pago? Lo decide la primera línea de cuota.
+  final firstCuota = lines.indexWhere((l) => l.number != null && l.date == null && l.money.isEmpty);
+  final firstDate = lines.indexWhere((l) => l.date != null);
+  final cuotaBelow = firstCuota >= 0 && firstDate >= 0 && firstCuota > firstDate;
   (int?, int?) cuotaNear(int i, int j) {
-    for (final k in [i, j, i - 1]) {
+    final hi = i > j ? i : j;
+    for (final k in [i, j, if (cuotaBelow) hi + 1 else i - 1]) {
       if (k >= 0 && k < lines.length && lines[k].number != null && (k == i || k == j || lines[k].date == null)) {
         return (lines[k].number, lines[k].of);
       }
@@ -395,6 +436,169 @@ ParsedStatement parseStatement(String text, {required DateTime today, List<Strin
   return ParsedStatement(institution: institution, groups: clean, totalPending: total);
 }
 
+/// Une fechas que el lector partió en dos líneas («23/jun/» + «26»).
+List<String> _joinSplitDates(List<String> lines) {
+  final out = <String>[];
+  for (var i = 0; i < lines.length; i++) {
+    final a = lines[i].trimRight();
+    if (RegExp(r'[/\-]$').hasMatch(a) && i + 1 < lines.length && RegExp(r'^\s*\d{2,4}\s*$').hasMatch(lines[i + 1])) {
+      out.add('$a${lines[i + 1].trim()}');
+      i++;
+    } else {
+      out.add(lines[i]);
+    }
+  }
+  return out;
+}
+
+// --- Resúmenes tipo «Estado de cuenta» (Debes / Abono mensual / Último abono) ---
+enum _Key { purchase, last, next, payoff, total, payment }
+
+final _summaryLabels = <(_Key, RegExp)>[
+  (_Key.last, RegExp(r'^ultim[oa] (abono|pago)[a-z ]*')),
+  (_Key.next, RegExp(r'^(proxim[oa] (abono|pago)|siguiente (abono|pago)|fecha (limite|de pago|de vencimiento)|vence|vencimiento)[a-z ]*')),
+  (_Key.purchase, RegExp(r'^(fecha de (compra|alta|apertura|contratacion)|comprad[oa] el)[a-z ]*')),
+  (_Key.payoff, RegExp(r'^(liquidas?|liquidar|para liquidar|pago para liquidar)[a-z ]*')),
+  (_Key.total, RegExp(r'^(debes|saldo( pendiente| actual| total)?|adeudo( total)?|te falta[n]? pagar|restante|deuda( total| pendiente)?|total pendiente|monto pendiente|por pagar)\b[a-z ]*')),
+  (_Key.payment, RegExp(r'^((abono|pago|cuota) (mensual|quincenal|semanal|catorcenal)|mensualidad|abono)\b[a-z ]*')),
+];
+final _reHeader = RegExp(r'^(estado de cuenta|mis compras|mis creditos|resumen|inicio|detalle|movimientos|mi cuenta)$');
+final _reFreq = RegExp(r'(mensual|quincenal|semanal|catorcenal|mensualidad)');
+
+Cents? _valueMoney(String s) {
+  final m = RegExp(r'^(?:\$|mxn)?\s*(\d{1,3}(?:,\d{3})+|\d+)(?:[.,](\d{2}))?\s*(?:mxn|pesos|mn)?$').firstMatch(s.trim());
+  if (m == null) return null;
+  return int.parse(m[1]!.replaceAll(',', '')) * 100 + int.parse(m[2] ?? '0');
+}
+
+DateTime? _valueDate(String s, DateTime today, {bool past = false}) {
+  final t = s.trim();
+  final hits = _dateHits(t, today);
+  if (hits.length != 1 || hits.first.end - hits.first.start < t.length - 2) return null;
+  final d = hits.first.date;
+  // Sin año en la captura y es una fecha pasada (compra, último abono): no puede ser futura.
+  if (past && d.isAfter(today) && !RegExp(r'\d{4}|[/\-.]\d{2}$').hasMatch(t)) return DateTime(d.year - 1, d.month, d.day);
+  return d;
+}
+
+class _Card {
+  String? name;
+  final values = <_Key, Object>{};
+  String? freq;
+  final queue = <_Key>[];
+  Cents? orphanMoney;
+  bool sawPayment = false;
+  bool get hasData => values.isNotEmpty;
+}
+
+DateTime _addPeriod(DateTime d, String? freq, int n) {
+  switch (freq) {
+    case 'quincenal':
+      return d.add(Duration(days: 15 * n));
+    case 'catorcenal':
+      return d.add(Duration(days: 14 * n));
+    case 'semanal':
+      return d.add(Duration(days: 7 * n));
+    default:
+      final m = d.month - 1 + n;
+      final y = d.year + m ~/ 12;
+      final mm = m % 12 + 1;
+      final last = DateTime(y, mm + 1, 0).day;
+      return DateTime(y, mm, d.day > last ? last : d.day);
+  }
+}
+
+ParsedStatement? _parseSummary(List<String> rawLines, DateTime today) {
+  final cards = <_Card>[_Card()];
+  bool isDateKey(_Key k) => k == _Key.purchase || k == _Key.last || k == _Key.next;
+  void put(_Card c, _Key k, Object v) => c.values[k] = v;
+  bool assign(_Card c, String text) {
+    final date = _valueDate(text, today, past: true);
+    final money = date == null ? _valueMoney(text) : null;
+    if (date == null && money == null) return false;
+    final idx = c.queue.indexWhere((k) => isDateKey(k) == (date != null));
+    if (idx < 0) {
+      if (money != null && !c.values.containsKey(_Key.payment)) c.orphanMoney ??= money;
+      return true;
+    }
+    final k = c.queue.removeAt(idx);
+    put(c, k, k == _Key.next ? _valueDate(text, today)! : (date ?? money!));
+    return true;
+  }
+
+  for (final rl in rawLines) {
+    final raw = rl.trim();
+    if (raw.isEmpty) continue;
+    final t = normalize(_ocrClean(raw)).replaceAll(RegExp(r'\s+'), ' ');
+    var c = cards.last;
+    (_Key, RegExpMatch)? label;
+    for (final (k, re) in _summaryLabels) {
+      final m = re.firstMatch(t);
+      if (m != null) {
+        label = (k, m);
+        break;
+      }
+    }
+    if (label != null) {
+      final (k, m) = label;
+      if (k == _Key.payment) c.sawPayment = true;
+      if (k == _Key.payment) c.freq ??= _reFreq.firstMatch(m[0]!)?[1]?.replaceAll('mensualidad', 'mensual');
+      // Valor en la misma línea («Debes 3,079»): lo que sigue a la etiqueta.
+      var rest = t.substring(m.end).trim();
+      if (rest.startsWith(':')) rest = rest.substring(1).trim();
+      if (rest.isNotEmpty) {
+        final v = isDateKey(k) ? _valueDate(rest, today, past: k != _Key.next) : _valueMoney(rest);
+        if (v != null) {
+          put(c, k, v);
+          continue;
+        }
+      }
+      if (k == _Key.payment && c.values.containsKey(_Key.payment)) continue; // repetido
+      c.queue.add(k);
+      continue;
+    }
+    if (assign(c, t)) continue;
+    // Una línea con letras y sin números: título de una nueva tarjeta.
+    if (!RegExp(r'\d').hasMatch(t) && RegExp(r'[a-z]{2}').hasMatch(t) && t.length <= 40 && !_reHeader.hasMatch(t)) {
+      if (c.hasData || c.queue.isNotEmpty) {
+        c = _Card();
+        cards.add(c);
+      }
+      c.name = raw;
+    }
+  }
+
+  final groups = <List<DetectedPayment>>[];
+  final info = <BlockInfo?>[];
+  for (final c in cards) {
+    final total = c.values[_Key.total] as Cents?;
+    final pay = (c.values[_Key.payment] as Cents?) ?? (c.sawPayment ? c.orphanMoney : null);
+    if (total == null || pay == null || pay <= 0) continue;
+    final last = c.values[_Key.last] as DateTime?;
+    final next = c.values[_Key.next] as DateTime?;
+    var first = next ?? (last != null ? _addPeriod(last, c.freq, 1) : _addPeriod(today, c.freq, 1));
+    var n = (total + pay - 1) ~/ pay;
+    if (n > 120) n = 120;
+    final list = <DetectedPayment>[];
+    for (var k = 0; k < n; k++) {
+      final amount = k == n - 1 ? total - pay * (n - 1) : pay;
+      list.add(DetectedPayment(_addPeriod(first, c.freq, k), amount, 'Estimado: abono ${c.freq ?? ''} de ${formatMoney(pay)}', number: k + 1, of: n));
+    }
+    groups.add(list);
+    info.add(BlockInfo(
+      name: c.name,
+      total: total,
+      payoff: c.values[_Key.payoff] as Cents?,
+      payment: pay,
+      frequency: c.freq,
+      lastPayment: last,
+      estimated: true,
+    ));
+  }
+  if (groups.isEmpty) return null;
+  return ParsedStatement(groups: groups, info: info, totalPending: groups.length == 1 ? info.first!.total : null);
+}
+
 // ---------------------------------------------------------------------------
 // Comparación con los registros
 // ---------------------------------------------------------------------------
@@ -430,6 +634,23 @@ List<ProposedChange> compareWithDebt(Ledger l, Debt debt, ParsedStatement s) {
   final open = l.installmentsOf(debt.id).where(l.isInstallmentOpen).toList();
   final used = <String>{};
   final out = <ProposedChange>[];
+  if (s.estimated) {
+    // Calendario calculado a partir del abono: se respetan las fechas que ya
+    // tienes y solo se ajustan los importes, en orden.
+    open.sort((a, b) => a.dueDate.compareTo(b.dueDate));
+    final ps = s.payments;
+    for (var k = 0; k < ps.length; k++) {
+      final p = ps[k];
+      if (k < open.length) {
+        final i = open[k];
+        final kept = DetectedPayment(i.dueDate, p.amount, p.line, number: p.number, of: p.of);
+        out.add(ProposedChange(i.amount == p.amount ? ChangeKind.unchanged : ChangeKind.update, kept, i));
+      } else {
+        out.add(ProposedChange(ChangeKind.newInstallment, p));
+      }
+    }
+    return out;
+  }
   for (final p in s.payments) {
     Installment? best;
     var bestGap = 4;

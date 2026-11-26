@@ -203,4 +203,76 @@ Compra 2
       expect(s.groups[1].single.amount, 8000);
     });
   });
+
+  group('Estado de cuenta y varias capturas', () {
+    test('Tarjetas con Debes / Abono mensual / Último abono (texto como lo lee el OCR)', () {
+      const text = r'''
+Estado de cuenta
+Att unefon
+Abono mensual
+$ 440
+Fecha de compra
+Debes
+Liquidas hoy con
+Abono mensual
+Último abono en línea
+23/jun/
+26
+3,079
+2,478
+440
+21/nov/
+26
+Audifono
+Abono mensual
+$ 72
+Fecha de compra 06/sept/26
+Debes 716
+Liquidas hoy con 550
+Abono mensual 72
+Último abono en línea 01/nov/26
+''';
+      final s = parseStatement(text, today: today);
+      expect(s.groups.length, 2);
+      final a = s.forGroup(0), b = s.forGroup(1);
+      expect(a.institution, 'Att unefon');
+      expect(a.totalPending, 307900);
+      expect(a.info.single!.payoff, 247800);
+      expect(a.payments.length, 7);
+      expect(a.payments.first.date, DateTime(2026, 12, 21));
+      expect(a.payments.first.amount, 44000);
+      expect(a.payments.last.amount, 307900 - 44000 * 6);
+      expect(b.institution, 'Audifono');
+      expect(b.totalPending, 71600);
+      expect(b.payments.length, 10);
+      expect(b.payments.first.date, DateTime(2026, 12, 1));
+      expect(b.payments.last.amount, 71600 - 7200 * 9);
+    });
+
+    test('Plan de pago en dos capturas seguidas es una sola deuda', () {
+      const text = r'''
+Plan de pago
+01 dic.
+$763.31
+1 / 13 pagos
+16 dic.
+$713.39
+2 / 13 pagos
+01 mar.
+$528.98
+7 / 13 pagos
+16 mar.
+$230.59
+8 / 13 pagos
+01 jun.
+$103.77
+13 / 13 pagos
+''';
+      final s = parseStatement(text, today: today);
+      expect(s.groups.length, 1);
+      expect(s.payments.map((p) => p.number), [1, 2, 7, 8, 13]);
+      expect(s.payments.last.date, DateTime(2027, 6, 1));
+      expect(s.payments.first.amount, 76331);
+    });
+  });
 }

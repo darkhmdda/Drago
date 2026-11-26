@@ -24,6 +24,7 @@ const _newDebt = '__nueva__';
 
 class _ImportScreenState extends State<ImportScreen> {
   bool _reading = false;
+  String _readingLabel = 'Leyendo la imagen…';
   String? _text;
   String? _error;
   String? _errorDetail;
@@ -51,16 +52,25 @@ class _ImportScreenState extends State<ImportScreen> {
   }
 
   Future<void> _pick(ImageSource source) async {
-    final image = await ImagePicker().pickImage(source: source, imageQuality: 95);
-    if (image == null) return;
+    // De la galería se pueden elegir varias capturas (por ejemplo, un plan de
+    // pagos que no cabe en una sola pantalla): se leen en orden como un solo texto.
+    final images = source == ImageSource.gallery
+        ? await ImagePicker().pickMultiImage(imageQuality: 95)
+        : [?await ImagePicker().pickImage(source: source, imageQuality: 95)];
+    if (images.isEmpty) return;
     setState(() {
       _reading = true;
+      _readingLabel = images.length > 1 ? 'Leyendo la imagen 1 de ${images.length}…' : 'Leyendo la imagen…';
       _error = null;
       _errorDetail = null;
     });
     try {
-      final text = await recognizeText(image);
-      _analyze(text);
+      final texts = <String>[];
+      for (var k = 0; k < images.length; k++) {
+        if (k > 0 && mounted) setState(() => _readingLabel = 'Leyendo la imagen ${k + 1} de ${images.length}…');
+        texts.add(await recognizeText(images[k]));
+      }
+      _analyze(texts.join('\n'));
     } catch (e) {
       setState(() {
         _error = 'No se pudo leer la imagen con el lector del teléfono. Intenta de nuevo o usa «Pegar texto».';
@@ -110,9 +120,11 @@ class _ImportScreenState extends State<ImportScreen> {
     final p = _parsed!;
     _group = i;
     final block = p.groups.isEmpty ? const <DetectedPayment>[] : p.groups[i];
-    final match = widget.debtId ?? (p.groups.length > 1 ? suggestDebt(l, block)?.id : null) ?? matchDebt(l, p)?.id ?? suggestDebt(l, block)?.id;
+    final one = p.groups.isEmpty ? p : p.forGroup(i);
+    final named = p.infoOf(i)?.name != null ? matchDebt(l, one)?.id : null;
+    final match = widget.debtId ?? named ?? (p.groups.length > 1 ? suggestDebt(l, block)?.id : null) ?? matchDebt(l, p)?.id ?? suggestDebt(l, block)?.id;
     _debtId = match ?? (l.debts.any((d) => d.status == DebtStatus.active) ? null : _newDebt);
-    _newName.text = p.institution ?? '';
+    _newName.text = one.institution ?? '';
     _updateTotal = false;
     _resetSelection();
   }
@@ -151,6 +163,7 @@ class _ImportScreenState extends State<ImportScreen> {
     final l = AppScope.of(context).ledger;
     final p = _current;
     final all = _parsed;
+    final info = p != null && p.info.isNotEmpty ? p.info.first : null;
     return Scaffold(
       appBar: AppBar(title: const Text('Importar captura')),
       body: PageBody(children: [
@@ -161,7 +174,7 @@ class _ImportScreenState extends State<ImportScreen> {
           FilledButton.icon(
             onPressed: _reading || !ocrAvailable ? null : () => _pick(ImageSource.gallery),
             icon: const Icon(Icons.image_outlined),
-            label: const Text('Elegir captura'),
+            label: const Text('Elegir capturas'),
           ),
           if (!kIsWeb)
             OutlinedButton.icon(
@@ -177,9 +190,9 @@ class _ImportScreenState extends State<ImportScreen> {
             child: Text('El lector de imágenes no está disponible aquí; puedes pegar el texto.', style: TextStyle(fontSize: 13)),
           ),
         if (_reading)
-          const Padding(
-            padding: EdgeInsets.all(24),
-            child: Column(children: [CircularProgressIndicator(), SizedBox(height: 8), Text('Leyendo la imagen…')]),
+          Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(children: [const CircularProgressIndicator(), const SizedBox(height: 8), Text(_readingLabel)]),
           ),
         if (_error != null) ...[
           Padding(padding: const EdgeInsets.only(top: 12), child: Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error))),
@@ -202,13 +215,15 @@ class _ImportScreenState extends State<ImportScreen> {
             )
           else ...[
             if (all != null && all.groups.length > 1) ...[
-              Text('Encontré ${all.groups.length} bloques de pagos (probablemente deudas distintas). Revisa uno por uno:'),
+              Text('Encontré ${all.groups.length} deudas distintas. Revisa una por una:'),
               const SizedBox(height: 8),
               Wrap(spacing: 8, runSpacing: 8, children: [
                 for (var i = 0; i < all.groups.length; i++)
                   ChoiceChip(
                     avatar: _doneGroups.contains(i) ? const Icon(Icons.check, size: 18) : null,
-                    label: Text('Bloque ${i + 1} · ${all.groups[i].length} × ${formatMoney(all.groups[i].first.amount)}'),
+                    label: Text(all.infoOf(i)?.name != null
+                        ? '${all.infoOf(i)!.name} · ${formatMoney(all.infoOf(i)!.total!)}'
+                        : 'Bloque ${i + 1} · ${all.groups[i].length} × ${formatMoney(all.groups[i].first.amount)}'),
                     selected: _group == i,
                     onSelected: (_) => setState(() => _selectGroup(i)),
                   ),
@@ -217,10 +232,23 @@ class _ImportScreenState extends State<ImportScreen> {
             ],
             Card(
               child: Column(children: [
-                ListTile(dense: true, title: const Text('Institución'), trailing: Text(p.institution ?? 'No identificada')),
-                ListTile(dense: true, title: const Text('Pagos encontrados'), trailing: Text('${p.payments.length}')),
+                ListTile(dense: true, title: Text(info == null ? 'Institución' : 'Deuda'), trailing: Text(p.institution ?? 'No identificada')),
+                if (info == null) ListTile(dense: true, title: const Text('Pagos encontrados'), trailing: Text('${p.payments.length}')),
                 if (p.totalPending != null)
                   ListTile(dense: true, title: const Text('Saldo pendiente'), trailing: Text(formatMoney(p.totalPending!))),
+                if (info?.payoff != null)
+                  ListTile(dense: true, title: const Text('Liquidas hoy con'), trailing: Text(formatMoney(info!.payoff!))),
+                if (info?.payment != null)
+                  ListTile(dense: true, title: Text('Abono ${info!.frequency ?? ''}'.trim()), trailing: Text(formatMoney(info.payment!))),
+                if (info?.lastPayment != null)
+                  ListTile(dense: true, title: const Text('Último abono'), trailing: Text(fmtDate(info!.lastPayment!))),
+                if (info?.estimated ?? false)
+                  ListTile(
+                    dense: true,
+                    leading: const Icon(Icons.info_outline),
+                    title: Text('La captura no trae el calendario: calculé ${p.payments.length} pago(s) a partir del abono'
+                        '${info!.lastPayment != null ? ' y el último abono' : ''}. Si la deuda ya existe, se conservan tus fechas y solo se ajustan importes.'),
+                  ),
               ]),
             ),
             gap,
