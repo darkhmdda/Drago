@@ -364,7 +364,10 @@ class _ImportScreenState extends State<ImportScreen> {
         dense: true,
         title: Text(label),
         trailing: Text.rich(TextSpan(children: [
-          if (changed) TextSpan(text: '$before  →  ', style: const TextStyle(decoration: TextDecoration.lineThrough)),
+          if (changed) ...[
+            TextSpan(text: before, style: const TextStyle(decoration: TextDecoration.lineThrough)),
+            const TextSpan(text: '  →  '),
+          ],
           TextSpan(text: after, style: const TextStyle(fontWeight: FontWeight.w700)),
         ])),
       );
@@ -394,7 +397,7 @@ class _ImportScreenState extends State<ImportScreen> {
           _row('Saldo pendiente', formatMoney(summary.remaining), formatMoney(info.total!), changed: summary.remaining != info.total),
           _row('Abono mensual', debt.isMonthly ? formatMoney(debt.monthlyPayment!) : 'cuotas fijas', formatMoney(info.payment!),
               changed: debt.monthlyPayment != info.payment),
-          _row('Día de pago', debt.isMonthly ? 'día ${debt.paymentDay}' : '—', 'día $day', changed: debt.paymentDay != day),
+          _row('Día de pago', debt.isMonthly ? 'día ${debt.paymentDay}' : 'sin día fijo', 'día $day', changed: debt.paymentDay != day),
         ]),
       ),
       ..._schedulePreview(p),
