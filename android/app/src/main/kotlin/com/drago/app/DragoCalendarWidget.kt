@@ -179,9 +179,9 @@ class DragoCalendarWidget : HomeWidgetProvider() {
             // Alto disponible bajo los días de la semana. Si sobra espacio
             // después de la lista, las semanas se hacen más altas.
             val avail = height - 20 - 28 - 16 - 24
-            val tall = avail - weeks * 40 >= minOf(candidates.size, 4) * 22
+            val tall = avail - weeks * 44 >= minOf(candidates.size, 4) * 22
             renderGrid(context, views, month, todayKey, events, colors, tall)
-            rows = ((avail - weeks * (if (tall) 40 else 26)) / 22).coerceIn(0, 15)
+            rows = ((avail - weeks * (if (tall) 44 else 32)) / 22).coerceIn(0, 15)
             views.setTextViewText(R.id.list_label, if (offset == 0) "Próximos" else "En ${MONTHS[month.get(Calendar.MONTH)].lowercase()}")
         } else {
             rows = ((height - 20 - 28) / 22).coerceIn(1, 15)
@@ -270,11 +270,11 @@ class DragoCalendarWidget : HomeWidgetProvider() {
                     }
                     if (income.contains(key)) {
                         cell.setViewVisibility(R.id.dot_i, View.VISIBLE)
-                        cell.setTextColor(R.id.dot_i, colors.income)
+                        cell.setInt(R.id.dot_i, "setColorFilter", colors.income)
                     }
                     if (pending.contains(key) || overdue.contains(key)) {
                         cell.setViewVisibility(R.id.dot_e, View.VISIBLE)
-                        cell.setTextColor(R.id.dot_e, if (overdue.contains(key)) colors.expense else colors.pending)
+                        cell.setInt(R.id.dot_e, "setColorFilter", if (overdue.contains(key)) colors.expense else colors.pending)
                     }
                     cell.setOnClickPendingIntent(R.id.cell, launch(context, "drago://calendar?date=$key"))
                 } else {

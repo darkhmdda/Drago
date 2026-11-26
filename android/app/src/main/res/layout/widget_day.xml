@@ -9,33 +9,35 @@
 
     <TextView
         android:id="@+id/day"
-        android:layout_width="20dp"
-        android:layout_height="20dp"
+        android:layout_width="21dp"
+        android:layout_height="21dp"
         android:gravity="center"
         android:textSize="11sp" />
 
+    <!-- Puntos de color: ingreso y pago (pendiente o vencido). -->
     <LinearLayout
         android:layout_width="wrap_content"
-        android:layout_height="6dp"
+        android:layout_height="7dp"
+        android:layout_marginTop="2dp"
         android:gravity="center"
         android:orientation="horizontal">
-        <TextView
+        <ImageView
             android:id="@+id/dot_i"
-            android:layout_width="wrap_content"
-            android:layout_height="6dp"
-            android:includeFontPadding="false"
-            android:gravity="center"
-            android:text="●"
-            android:textSize="5sp"
+            android:layout_width="7dp"
+            android:layout_height="7dp"
+            android:layout_marginStart="1dp"
+            android:layout_marginEnd="1dp"
+            android:src="@drawable/widget_today"
+            android:contentDescription="@null"
             android:visibility="gone" />
-        <TextView
+        <ImageView
             android:id="@+id/dot_e"
-            android:layout_width="wrap_content"
-            android:layout_height="6dp"
-            android:includeFontPadding="false"
-            android:gravity="center"
-            android:text="●"
-            android:textSize="5sp"
+            android:layout_width="7dp"
+            android:layout_height="7dp"
+            android:layout_marginStart="1dp"
+            android:layout_marginEnd="1dp"
+            android:src="@drawable/widget_today"
+            android:contentDescription="@null"
             android:visibility="gone" />
     </LinearLayout>
 </LinearLayout>
