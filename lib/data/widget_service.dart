@@ -121,7 +121,8 @@ Map<String, dynamic> buildWidgetData(Ledger l, ThemeData theme, {required bool h
       for (final e in events.take(200))
         {
           'd': _ymd(e.date),
-          't': e.title,
+          // «Didi Préstamos · cuota 1» → «Didi Préstamos #1» (cabe mejor).
+          't': e.title.replaceAllMapped(RegExp(r' · cuota (\d+)'), (m) => ' #${m[1]}'),
           'a': formatMoney(e.signed, signed: true),
           'k': e.isIncome ? 'i' : 'e',
           if (e.overdue) 'o': 1,

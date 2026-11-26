@@ -160,7 +160,6 @@ class DragoCalendarWidget : HomeWidgetProvider() {
             views.setOnClickPendingIntent(R.id.next, arrow(context, id, ACTION_NEXT))
             views.setViewVisibility(R.id.weekdays, View.VISIBLE)
             views.setViewVisibility(R.id.grid, View.VISIBLE)
-            renderGrid(context, views, month, todayKey, events, colors)
         } else {
             views.setTextViewText(R.id.title, if (json == null) "Drago" else "Próximos · $monthName")
             views.setViewVisibility(R.id.prev, View.GONE)
@@ -169,11 +168,25 @@ class DragoCalendarWidget : HomeWidgetProvider() {
             views.setViewVisibility(R.id.grid, View.GONE)
         }
 
-        // Lista de próximos movimientos (los vencidos primero).
+        // Lista: en el mes actual, los próximos (vencidos primero); al ver otro
+        // mes, los movimientos de ese mes.
+        val monthKey = ymd(month).substring(0, 7)
+        val candidates = if (offset == 0) events.filter { it.overdue || it.date >= todayKey }
+        else events.filter { it.date.startsWith(monthKey) }
         val weeks = weeksIn(month)
-        val used = if (large) 28 + 16 + weeks * 26 + 26 + 20 else 28 + 20
-        val rows = ((height - used) / 22).coerceIn(if (large) 0 else 1, 6)
-        val upcoming = events.filter { it.overdue || it.date >= todayKey }.take(rows)
+        val rows: Int
+        if (large) {
+            // Alto disponible bajo los días de la semana. Si sobra espacio
+            // después de la lista, las semanas se hacen más altas.
+            val avail = height - 20 - 28 - 16 - 24
+            val tall = avail - weeks * 40 >= minOf(candidates.size, 4) * 22
+            renderGrid(context, views, month, todayKey, events, colors, tall)
+            rows = ((avail - weeks * (if (tall) 40 else 26)) / 22).coerceIn(0, 15)
+            views.setTextViewText(R.id.list_label, if (offset == 0) "Próximos" else "En ${MONTHS[month.get(Calendar.MONTH)].lowercase()}")
+        } else {
+            rows = ((height - 20 - 28) / 22).coerceIn(1, 15)
+        }
+        val upcoming = candidates.take(rows)
         views.removeAllViews(R.id.list)
         views.setViewVisibility(R.id.list_label, if (large && rows > 0) View.VISIBLE else View.GONE)
         if (json == null) {
@@ -181,7 +194,7 @@ class DragoCalendarWidget : HomeWidgetProvider() {
             views.setTextViewText(R.id.empty, "Abre Drago para cargar tu calendario.")
         } else {
             views.setViewVisibility(R.id.empty, if (upcoming.isEmpty() && rows > 0) View.VISIBLE else View.GONE)
-            views.setTextViewText(R.id.empty, "Sin pagos próximos.")
+            views.setTextViewText(R.id.empty, if (offset == 0) "Sin pagos próximos." else "Sin movimientos este mes.")
         }
         for (e in upcoming) {
             val row = RemoteViews(pkg, R.layout.widget_event_row)
@@ -215,7 +228,7 @@ class DragoCalendarWidget : HomeWidgetProvider() {
         return "$d ${SHORT[(m - 1).coerceIn(0, 11)]}"
     }
 
-    private fun renderGrid(context: Context, views: RemoteViews, month: Calendar, todayKey: String, events: List<Ev>, colors: Colors) {
+    private fun renderGrid(context: Context, views: RemoteViews, month: Calendar, todayKey: String, events: List<Ev>, colors: Colors, tall: Boolean) {
         val pkg = context.packageName
         // Qué hay cada día: ingreso, pago pendiente o pago vencido.
         val income = HashSet<String>()
@@ -236,7 +249,7 @@ class DragoCalendarWidget : HomeWidgetProvider() {
         val weeks = weeksIn(month)
         val day = first.clone() as Calendar
         for (w in 0 until weeks) {
-            val row = RemoteViews(pkg, R.layout.widget_week_row)
+            val row = RemoteViews(pkg, if (tall) R.layout.widget_week_row_tall else R.layout.widget_week_row)
             for (c in 0 until 7) {
                 val cell = RemoteViews(pkg, R.layout.widget_day)
                 val n = w * 7 + c - lead + 1
