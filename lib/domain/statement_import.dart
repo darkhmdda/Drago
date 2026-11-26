@@ -49,69 +49,243 @@ const knownInstitutions = ['DiDi', 'Mercado Pago', 'Coppel', 'Nu', 'BBVA', 'Bana
   'Kueski', 'Elektra', 'Liverpool', 'Aplazo', 'Baubap', 'Plata', 'Spin', 'HSBC', 'Banco Azteca'];
 
 final _monthAlt = _monthNames.keys.toList()..sort((a, b) => b.length.compareTo(a.length));
-// «16 dic», «16 de diciembre de 2026», «16/dic/2026», «16-dic-26».
-final _reDayMonth = RegExp(r'\b(\d{1,2})\s*[/\-.]?\s*(?:de\s+)?(' +
-    _monthAlt.join('|') +
-    r')\.?(?:\s*[/\-.]?\s*(?:de(?:l)?\s+)?(\d{4}|\d{2}(?!\d)))?(?![a-z])');
-// «2 de 6», «cuota 3 de 12», «pago 4/6».
-final _reCuota = RegExp(r'\b(?:cuota|pago|mensualidad|parcialidad)?\s*(\d{1,2})\s*(?:de|/)\s*(\d{1,2})\b(?!\s*[/\-.]\s*\d)');
-final _reMonthDay = RegExp(r'\b(' + _monthAlt.join('|') + r')\.?\s+(\d{1,2})(?:,?\s*(\d{4}))?\b');
-final _reNumeric = RegExp(r'\b(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})\b');
-// Importes con centavos o con signo de pesos (para no confundir días o folios con dinero).
-final _reMoney = RegExp(r'(?:\$|mxn)\s*(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d{2}))?|\b(\d{1,3}(?:,\d{3})+|\d+)\.(\d{2})\b');
+final _mon = '(${_monthAlt.join('|')})';
 
-DateTime _infer(int day, int month, int? year, DateTime today) {
-  if (year != null) return DateTime(year < 100 ? 2000 + year : year, month, day);
+// --- Fechas (sobre texto normalizado: minúsculas y sin acentos) ---
+// 2026-12-16
+final _reIso = RegExp(r'\b(20\d{2})[/\-.](\d{1,2})[/\-.](\d{1,2})\b');
+// 16/12/2026, 16-12-26, 16.12.2026
+final _reNumeric = RegExp(r'\b(\d{1,2})\s?[/\-.]\s?(\d{1,2})\s?[/\-.]\s?(\d{4}|\d{2})(?!\d)');
+// 16 dic, 16 de diciembre de 2026, 16/dic/2026, 16-dic-26, 16dic
+final _reDayMonth = RegExp(r'\b(\d{1,2})\s*[/\-.]?\s*(?:de\s+)?' + _mon + r'\.?(?:\s*[/\-.,]?\s*(?:de(?:l)?\s+)?(\d{4}|\d{2}(?![\d:])))?(?![a-z])');
+// dic 16, 2026 · diciembre 16
+final _reMonthDay = RegExp(r'(?<![a-z])' + _mon + r'\.?\s*[/\-.]?\s*(\d{1,2})(?![\d:])(?:,?\s*(\d{4}))?');
+// 16/12 (sin año): solo si la línea habla de pagos o trae un importe
+final _reShort = RegExp(r'\b(\d{1,2})[/\-](\d{1,2})\b(?!\s*[/\-]\s*\d)');
+final _reRelative = RegExp(r'\b(hoy|pasado manana|manana)\b');
+final _rePayWords = RegExp(r'(vence|vencimiento|limite|pagar antes|fecha de pago|proximo pago|cuota|pago|mensualidad|quincena|parcialidad|abono)');
+final _rePurchase = RegExp(r'(compra|comprado|realizad[oa]|adquirid|fecha de compra|desde el)');
+
+// «2 de 6», «cuota 3 de 12», «pago 4/6», «3/6 mensualidades».
+final _reCuota = RegExp(r'\b(?:cuota|pago|mensualidad|parcialidad|quincena)?\s*(\d{1,2})\s*(?:de|/)\s*(\d{1,2})\b(?!\s*[/\-.]\s*\d)');
+
+// Líneas de cuotas ya pagadas (no se proponen) y de totales.
+final _rePaid = RegExp(r'\b(pagad[oa]s?|pagaste|liquidad[oa]s?|cubiert[oa]s?|abonad[oa]s?|completad[oa]s?)\b');
+final _reNotPaid = RegExp(r'(por pagar|a pagar|sin pagar|no pagad|pendiente de pago)');
+final _reTotal = RegExp(r'(saldo|total|pendiente|deuda|por pagar|restante|adeudo|te faltan|faltan|resta )');
+final _reNotTotal = RegExp(r'(cuota|pago \d|parcialidad|mensualidad|quincena|vence|fecha|\d+\s*de\s*\d+)');
+// Separadores entre deudas: «Imagen 2», «Compra 3», «---».
+final _reBoundary = RegExp(r'^(imagen|captura|foto|screenshot|compra|pedido|producto|orden|prestamo|credito)\b|^[-=_*]{3,}');
+
+/// Corrige confusiones típicas del lector de texto en números:
+/// «2O.12» → «20.12», «l6» → «16», «S 21.12» → «$ 21.12», espacios raros, etc.
+String _ocrClean(String line) {
+  var s = line
+      .replaceAll(RegExp(r'[   ]'), ' ')
+      .replaceAll(RegExp(r'[＄﹩]'), r'$')
+      .replaceAll(RegExp(r'[–—−]'), '-')
+      .replaceAll('，', ',')
+      .replaceAll('．', '.');
+  // «S 21.12» o «S21.12» al inicio de un importe → «$».
+  s = s.replaceAllMapped(RegExp(r'(^|[\s:(])S\s?(?=\d)'), (m) => '${m[1]}\$');
+  // Letras confundidas con dígitos cuando están entre dígitos.
+  for (var k = 0; k < 2; k++) {
+    s = s.replaceAllMapped(RegExp(r'(?<=\d)[Oo](?=[\d.,]|\b)'), (_) => '0');
+    s = s.replaceAllMapped(RegExp(r'(?<=[\d$])[lI|](?=\d)'), (_) => '1');
+    s = s.replaceAllMapped(RegExp(r'(?<=\d)[lI|](?=[\d.,/\-]|\b)'), (_) => '1');
+    s = s.replaceAllMapped(RegExp(r'(?<![A-Za-z])[lI|](?=\d)'), (_) => '1');
+  }
+  return s;
+}
+
+DateTime? _mk(int y, int m, int d) {
+  if (m < 1 || m > 12 || d < 1 || d > 31) return null;
+  final dt = DateTime(y, m, d);
+  return dt.month == m ? dt : null; // descarta 31 de febrero, etc.
+}
+
+DateTime? _infer(int day, int month, int? year, DateTime today) {
+  if (year != null) return _mk(year < 100 ? 2000 + year : year, month, day);
   var y = today.year;
   // Sin año: el más cercano (los estados de cuenta muestran fechas próximas).
   if (month < today.month - 3) y++;
   if (month > today.month + 8) y--;
-  return DateTime(y, month, day);
+  return _mk(y, month, day);
 }
 
-List<DateTime> _dates(String t, DateTime today) {
-  final out = <DateTime>[];
+class _DateHit {
+  final DateTime date;
+  final int start, end;
+  const _DateHit(this.date, this.start, this.end);
+}
+
+List<_DateHit> _dateHits(String t, DateTime today) {
+  final out = <_DateHit>[];
+  final taken = List<bool>.filled(t.length + 1, false);
+  void add(RegExpMatch m, DateTime? d) {
+    if (d == null) return;
+    for (var k = m.start; k < m.end; k++) {
+      if (taken[k]) return;
+    }
+    for (var k = m.start; k < m.end; k++) {
+      taken[k] = true;
+    }
+    out.add(_DateHit(d, m.start, m.end));
+  }
+
+  for (final m in _reIso.allMatches(t)) {
+    add(m, _mk(int.parse(m[1]!), int.parse(m[2]!), int.parse(m[3]!)));
+  }
+  for (final m in _reNumeric.allMatches(t)) {
+    final y = int.parse(m[3]!);
+    add(m, _mk(y < 100 ? 2000 + y : y, int.parse(m[2]!), int.parse(m[1]!)));
+  }
   for (final m in _reDayMonth.allMatches(t)) {
-    final d = int.parse(m.group(1)!);
-    final y = int.tryParse(m.group(3) ?? '');
-    if (d >= 1 && d <= 31) out.add(_infer(d, _monthNames[m.group(2)]!, y == null ? null : (y < 100 ? 2000 + y : y), today));
+    final y = int.tryParse(m[3] ?? '');
+    add(m, _infer(int.parse(m[1]!), _monthNames[m[2]]!, y, today));
   }
-  if (out.isEmpty) {
-    for (final m in _reMonthDay.allMatches(t)) {
-      final d = int.parse(m.group(2)!);
-      if (d >= 1 && d <= 31) out.add(_infer(d, _monthNames[m.group(1)]!, int.tryParse(m.group(3) ?? ''), today));
+  for (final m in _reMonthDay.allMatches(t)) {
+    add(m, _infer(int.parse(m[2]!), _monthNames[m[1]]!, int.tryParse(m[3] ?? ''), today));
+  }
+  if (out.isEmpty && (_rePayWords.hasMatch(t) || _moneyIn(t).isNotEmpty)) {
+    for (final m in _reShort.allMatches(t)) {
+      // «2/6» suele ser número de cuota, no fecha.
+      final a = int.parse(m[1]!), b = int.parse(m[2]!);
+      if (a <= b && RegExp(r'(cuota|mensualidad|pago|parcialidad)\s*$').hasMatch(t.substring(0, m.start))) continue;
+      if (a <= b && b <= 24 && !RegExp(r'\d\s*[/\-]\s*\d').hasMatch(t.substring(m.end).trimLeft().padRight(3).substring(0, 3))) {
+        // Ambiguo (podría ser «cuota 2/6»): solo se acepta si parece fecha (día > 12 o con palabra de vencimiento).
+        if (a <= 12 && !RegExp(r'(vence|limite|fecha)').hasMatch(t)) continue;
+      }
+      add(m, _infer(a, b, null, today));
     }
   }
-  if (out.isEmpty) {
-    for (final m in _reNumeric.allMatches(t)) {
-      final d = int.parse(m.group(1)!), mo = int.parse(m.group(2)!);
-      if (d >= 1 && d <= 31 && mo >= 1 && mo <= 12) out.add(_infer(d, mo, int.parse(m.group(3)!), today));
+  if (out.isEmpty && RegExp(r'(vence|limite|pag)').hasMatch(t)) {
+    final m = _reRelative.firstMatch(t);
+    if (m != null) {
+      final d = switch (m[1]) { 'hoy' => 0, 'manana' => 1, _ => 2 };
+      out.add(_DateHit(today.add(Duration(days: d)), m.start, m.end));
     }
   }
+  out.sort((a, b) => a.start.compareTo(b.start));
   return out;
 }
 
-List<Cents> _money(String t) {
-  final out = <Cents>[];
-  for (final m in _reMoney.allMatches(t)) {
-    final whole = (m.group(1) ?? m.group(3))!.replaceAll(',', '');
-    final frac = m.group(2) ?? m.group(4) ?? '00';
-    out.add(int.parse(whole) * 100 + int.parse(frac.padRight(2, '0')));
+/// La fecha de pago de una línea: si hay varias, la que sigue a «vence»,
+/// «límite», «pago»…; se descarta la de compra.
+DateTime? _payDate(String t, List<_DateHit> hits) {
+  if (hits.isEmpty) return null;
+  if (hits.length == 1) {
+    final before = t.substring(0, hits.first.start);
+    if (_rePurchase.hasMatch(before) && !_rePayWords.hasMatch(before)) return null;
+    return hits.first.date;
   }
-  return out;
+  for (final h in hits) {
+    final before = t.substring(h.start >= 25 ? h.start - 25 : 0, h.start);
+    if (RegExp(r'(vence|vencimiento|limite|pagar antes|fecha de pago|proximo pago|pago)').hasMatch(before)) return h.date;
+  }
+  return hits.last.date;
 }
 
-bool _isTotalLine(String t) =>
-    RegExp(r'(saldo|total|pendiente|deuda|por pagar|restante|adeudo)').hasMatch(t) &&
-    !RegExp(r'(cuota|pago \d|parcialidad|mensualidad|quincena|vence|fecha)').hasMatch(t);
+// --- Importes ---
+// Con moneda: «$21.12», «$ 1,234.56», «$1 234.56», «$21,12», «$301 41» (centavos pequeños), «MXN 21.12», «$21».
+final _reMoneyCur = RegExp(
+    r'(?:\$|mxn|mn)\s*(\d{1,3}(?:[ ,]\d{3})+|\d+)(?:([.,])(\d{2})(?!\d)|\s(\d{2})(?![\d.,/]))?');
+// Moneda al final: «21.12 MXN», «1,250.50 pesos», «400 pesos».
+final _reMoneyAfter = RegExp(r'(?<![\d.,])(\d{1,3}(?:,\d{3})+|\d+)(?:([.,])(\d{2}))?\s*(?:mxn|pesos|mn)\b');
+// Sin moneda, con centavos: «21.12», «1,234.56», «21,12».
+final _reMoneyBare = RegExp(r'(?<![\d.,/:\-])(\d{1,3}(?:,\d{3})+|\d+)([.,])(\d{2})(?![\d.,/%:])');
 
-/// Interpreta el texto leído de una captura (OCR).
+List<Cents> _moneyIn(String t) {
+  final out = <(int, Cents)>[];
+  final taken = <int>{};
+  void add(RegExpMatch m, String whole, String? cents) {
+    if (taken.contains(m.start)) return;
+    for (var k = m.start; k < m.end; k++) {
+      taken.add(k);
+    }
+    final w = int.tryParse(whole.replaceAll(RegExp(r'[ ,]'), ''));
+    if (w == null) return;
+    out.add((m.start, w * 100 + int.parse((cents ?? '00').padRight(2, '0'))));
+  }
+
+  for (final m in _reMoneyCur.allMatches(t)) {
+    add(m, m[1]!, m[3] ?? m[4]);
+  }
+  for (final m in _reMoneyAfter.allMatches(t)) {
+    if (!taken.contains(m.start)) add(m, m[1]!, m[3]);
+  }
+  for (final m in _reMoneyBare.allMatches(t)) {
+    if (taken.contains(m.start)) continue;
+    // «1,234» con 3 dígitos tras la coma son miles, no centavos (ya excluido por la regex).
+    add(m, m[1]!, m[3]);
+  }
+  out.sort((a, b) => a.$1.compareTo(b.$1));
+  return [for (final e in out) e.$2];
+}
+
+/// Importes de una línea sin contar lo que ya se leyó como fecha.
+List<Cents> _money(String t, List<_DateHit> hits) {
+  var s = t;
+  for (final h in hits.reversed) {
+    s = s.replaceRange(h.start, h.end, ' ' * (h.end - h.start));
+  }
+  // Tampoco «2 de 6» ni porcentajes.
+  s = s.replaceAll(_reCuota, ' ').replaceAll(RegExp(r'\d+(?:[.,]\d+)?\s*%'), ' ');
+  return _moneyIn(s);
+}
+
+(int?, int?) _cuotaIn(String t, List<_DateHit> hits) {
+  var s = t;
+  for (final h in hits.reversed) {
+    s = s.replaceRange(h.start, h.end, ' ' * (h.end - h.start));
+  }
+  for (final m in _reCuota.allMatches(s)) {
+    final a = int.parse(m[1]!), b = int.parse(m[2]!);
+    // «2 de 6» es cuota; «16 de 2026» no.
+    if (a >= 1 && a <= b && b >= 2 && b <= 60) return (a, b);
+  }
+  return (null, null);
+}
+
+class _Line {
+  final String raw;
+  final String t;
+  final List<_DateHit> hits;
+  final DateTime? date;
+  final List<Cents> money;
+  final bool total, paid, boundary;
+  final int? number, of;
+  _Line(this.raw, this.t, this.hits, this.date, this.money, this.total, this.paid, this.boundary, this.number, this.of);
+}
+
+/// Interpreta el texto leído de una captura (OCR) o pegado a mano.
 ///
-/// Busca fechas con importe en la misma línea o en líneas vecinas (las apps
-/// suelen poner la fecha arriba o abajo del importe) y el total pendiente.
+/// Tolera las variaciones habituales: fechas en cualquier formato común,
+/// importes con o sin «$», coma decimal, centavos pequeños, errores típicos
+/// del lector de texto, fecha e importe en la misma línea, en líneas vecinas o
+/// en columnas separadas. Ignora cuotas marcadas como pagadas y separa varias
+/// deudas en bloques.
 ParsedStatement parseStatement(String text, {required DateTime today, List<String> extraNames = const []}) {
-  final lines = text.split(RegExp(r'\r?\n')).map((l) => l.trim()).where((l) => l.isNotEmpty).toList();
-  final norm = lines.map(normalize).toList();
+  final rawLines = text.split(RegExp(r'\r?\n'));
+  final lines = <_Line>[];
+  final boundaryBefore = <int>{}; // índices de líneas precedidas por un separador
+  var blanks = 0;
+  for (final rl in rawLines) {
+    final raw = rl.trim();
+    if (raw.isEmpty) {
+      blanks++;
+      continue;
+    }
+    final t = normalize(_ocrClean(raw));
+    final hits = _dateHits(t, today);
+    final total = _reTotal.hasMatch(t) && !_reNotTotal.hasMatch(t);
+    final paid = _rePaid.hasMatch(t) && !_reNotPaid.hasMatch(t);
+    final boundary = _reBoundary.hasMatch(t) && hits.isEmpty;
+    final (number, of) = _cuotaIn(t, hits);
+    if (blanks >= 2 || boundary) boundaryBefore.add(lines.length);
+    blanks = 0;
+    lines.add(_Line(raw, t, hits, _payDate(t, hits), _money(t, hits), total, paid, boundary, number, of));
+  }
   final all = normalize(text);
 
   String? institution;
@@ -123,62 +297,89 @@ ParsedStatement parseStatement(String text, {required DateTime today, List<Strin
     }
   }
 
+  // Total pendiente.
   Cents? total;
-  final payments = <DetectedPayment>[];
   final usedMoney = <int>{};
-  for (var i = 0; i < norm.length; i++) {
-    final t = norm[i];
-    if (_isTotalLine(t)) {
-      final m = _money(t).isNotEmpty ? _money(t) : (i + 1 < norm.length ? _money(norm[i + 1]) : const <Cents>[]);
-      if (m.isNotEmpty && total == null) {
-        total = m.first;
-        usedMoney.add(_money(t).isNotEmpty ? i : i + 1);
-      }
-      continue;
+  for (var i = 0; i < lines.length && total == null; i++) {
+    if (!lines[i].total) continue;
+    if (lines[i].money.isNotEmpty) {
+      total = lines[i].money.first;
+      usedMoney.add(i);
+    } else if (i + 1 < lines.length && lines[i + 1].money.isNotEmpty && lines[i + 1].date == null) {
+      total = lines[i + 1].money.first;
+      usedMoney.add(i + 1);
     }
-    final ds = _dates(t, today);
-    if (ds.isEmpty) continue;
-    var ms = _money(t);
-    var src = i;
-    if (ms.isEmpty) {
-      // Importe en la línea siguiente o en la anterior.
-      for (final j in [i + 1, i - 1, i + 2]) {
-        if (j < 0 || j >= norm.length || usedMoney.contains(j) || _dates(norm[j], today).isNotEmpty) continue;
-        final mj = _money(norm[j]);
-        if (mj.isNotEmpty) {
-          ms = mj;
-          src = j;
-          break;
-        }
-      }
-    }
-    if (ms.isEmpty) continue;
-    usedMoney.add(src);
-    final cuota = _reCuota.firstMatch(t.replaceAll(RegExp(r'\d{1,2}\s*[/\-.]\s*\d{1,2}\s*[/\-.]\s*\d{2,4}'), ' '));
-    int? number, of;
-    if (cuota != null) {
-      final a = int.parse(cuota.group(1)!), b = int.parse(cuota.group(2)!);
-      if (a >= 1 && a <= b && b <= 60) {
-        number = a;
-        of = b;
-      }
-    }
-    payments.add(DetectedPayment(ds.first, ms.first, lines[i] == lines[src] ? lines[i] : '${lines[i]} · ${lines[src]}',
-        number: number, of: of));
   }
 
-  // Bloques: uno nuevo cada vez que la numeración de cuotas vuelve a empezar
-  // o cambia el total de cuotas (otra deuda).
+  // Número de cuota: de la línea o de una línea vecina sin fecha («Cuota 2 de 6» arriba).
+  (int?, int?) cuotaNear(int i, int j) {
+    for (final k in [i, j, i - 1]) {
+      if (k >= 0 && k < lines.length && lines[k].number != null && (k == i || k == j || lines[k].date == null)) {
+        return (lines[k].number, lines[k].of);
+      }
+    }
+    return (null, null);
+  }
+
+  // Paso A: fecha con importe en la misma línea o en una vecina.
+  final a = <(int, DetectedPayment)>[];
+  final usedA = {...usedMoney};
+  final paidLines = <int>{};
+  for (var i = 0; i < lines.length; i++) {
+    final l = lines[i];
+    if (l.total || l.date == null) continue;
+    var src = -1;
+    if (l.money.isNotEmpty && !usedA.contains(i)) {
+      src = i;
+    } else {
+      for (final j in [i + 1, i - 1, i + 2]) {
+        if (j < 0 || j >= lines.length || usedA.contains(j) || lines[j].date != null || lines[j].total || lines[j].money.isEmpty) continue;
+        src = j;
+        break;
+      }
+    }
+    if (src < 0) continue;
+    usedA.add(src);
+    if (l.paid || lines[src].paid) {
+      paidLines.add(i);
+      continue;
+    }
+    final (n, of) = cuotaNear(i, src);
+    a.add((i < src ? i : src, DetectedPayment(l.date!, lines[src].money.first, i == src ? l.raw : '${l.raw} · ${lines[src].raw}', number: n, of: of)));
+  }
+
+  // Paso B: columnas (todas las fechas y luego todos los importes, o al revés).
+  final dateIdx = [for (var i = 0; i < lines.length; i++) if (lines[i].date != null && !lines[i].total && !lines[i].paid && lines[i].money.isEmpty) i];
+  final moneyIdx = [
+    for (var i = 0; i < lines.length; i++)
+      if (lines[i].date == null && lines[i].money.isNotEmpty && !lines[i].total && !lines[i].paid && !usedMoney.contains(i)) i
+  ];
+  final b = <(int, DetectedPayment)>[];
+  if (dateIdx.length >= 2 && dateIdx.length == moneyIdx.length) {
+    for (var k = 0; k < dateIdx.length; k++) {
+      final i = dateIdx[k], j = moneyIdx[k];
+      final (n, of) = cuotaNear(i, j);
+      b.add((i < j ? i : j, DetectedPayment(lines[i].date!, lines[j].money.first, '${lines[i].raw} · ${lines[j].raw}', number: n, of: of)));
+    }
+  }
+  // También cuentan las líneas que ya traían fecha e importe juntos.
+  final sameLine = [for (final e in a) if (lines[e.$1].date != null && lines[e.$1].money.isNotEmpty) e];
+  final candidateB = [...sameLine, ...b]..sort((x, y) => x.$1.compareTo(y.$1));
+  final chosen = candidateB.length > a.length ? candidateB : a;
+
+  // Bloques: separador explícito, o numeración que vuelve a empezar / cambia el total.
   final groups = <List<DetectedPayment>>[];
-  DetectedPayment? prev;
-  for (final p in payments) {
+  (int, DetectedPayment)? prev;
+  for (final e in chosen) {
+    final p = e.$2;
+    final sep = prev != null && boundaryBefore.any((k) => k > prev!.$1 && k <= e.$1);
     final restart = prev != null &&
         p.number != null &&
-        prev.number != null &&
-        (p.number! <= prev.number! || (p.of != null && prev.of != null && p.of != prev.of));
-    if (groups.isEmpty || restart) groups.add([]);
+        prev.$2.number != null &&
+        (p.number! <= prev.$2.number! || (p.of != null && prev.$2.of != null && p.of != prev.$2.of));
+    if (groups.isEmpty || restart || sep) groups.add([]);
     groups.last.add(p);
-    prev = p;
+    prev = e;
   }
   // En cada bloque: sin duplicados (misma fecha e importe) y en orden.
   final clean = [
@@ -186,7 +387,7 @@ ParsedStatement parseStatement(String text, {required DateTime today, List<Strin
       () {
         final seen = <String>{};
         return [
-          for (final p in g..sort((a, b) => a.date.compareTo(b.date)))
+          for (final p in g..sort((x, y) => x.date.compareTo(y.date)))
             if (seen.add('${p.date}|${p.amount}')) p,
         ];
       }(),

@@ -136,4 +136,71 @@ Detalle de las mensualidades (A pagar)
       expect(c.single.kind, ChangeKind.alreadyPaid); // no se vuelve a proponer ni se modifica
     });
   });
+
+  group('Formatos variados', () {
+    List<(String, int)> flat(ParsedStatement s) => [
+          for (final p in s.payments) ('${p.date.year}-${p.date.month}-${p.date.day}', p.amount),
+        ];
+
+    test('Columnas separadas por el lector (fechas y luego montos)', () {
+      const text = r'''
+Fecha de pago
+16 dic 2026
+30 dic 2026
+13 ene 2027
+Monto
+$ 301.41
+$ 301.41
+$ 299.80
+''';
+      final s = parseStatement(text, today: today);
+      expect(flat(s), [('2026-12-16', 30141), ('2026-12-30', 30141), ('2027-1-13', 29980)]);
+    });
+
+    test('Coma decimal, ISO, errores de OCR y centavos sin punto', () {
+      const text = r'''
+2026-12-16   $21,12
+l6/0l/2027  S 1,2O5.50
+Vence 3 feb   $ 301 41
+''';
+      final s = parseStatement(text, today: today);
+      expect(flat(s), [('2026-12-16', 2112), ('2027-1-16', 120550), ('2027-2-3', 30141)]);
+    });
+
+    test('Ignora cuotas pagadas y toma la fecha de vencimiento', () {
+      const text = r'''
+Compra realizada el 2 nov 2026
+Cuota 1 de 3 · 2 dic 2026 · $100.00 · Pagada
+Cuota 2 de 3 · vence 2 ene 2027 · $100.00
+Cuota 3 de 3 · vence 2 feb 2027 · $100.00
+Saldo pendiente $200.00
+''';
+      final s = parseStatement(text, today: today);
+      expect(flat(s), [('2027-1-2', 10000), ('2027-2-2', 10000)]);
+      expect(s.totalPending, 20000);
+    });
+
+    test('Montos al final con "pesos" y fecha dd/mm sin año', () {
+      const text = r'''
+Próximo pago 20/12  450 pesos
+Siguiente 20/01  450 pesos
+''';
+      final s = parseStatement(text, today: today);
+      expect(flat(s), [('2026-12-20', 45000), ('2027-1-20', 45000)]);
+    });
+
+    test('Separadores explícitos entre deudas', () {
+      const text = r'''
+Compra 1
+10 dic 2026 $50.00
+10 ene 2027 $50.00
+---
+Compra 2
+15 dic 2026 $80.00
+''';
+      final s = parseStatement(text, today: today);
+      expect(s.groups.length, 2);
+      expect(s.groups[1].single.amount, 8000);
+    });
+  });
 }
