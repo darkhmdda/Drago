@@ -275,4 +275,40 @@ $103.77
       expect(s.payments.first.amount, 76331);
     });
   });
+
+  test('Estado de cuenta leído por el OCR del navegador (ruido de iconos)', () {
+    const text = r'''
+€ Estado de cuenta "
+e Att unefon baña
+Abono mensual
+Fecha de compra 23/jun/
+26
+Debes 3,079
+Liquidas hoy con 2,478
+Abono mensual 440
+Último abono en línea 21/nov/
+26
+e Audifono $7
+Abono mensual
+Fecha de compra 06/sept/
+26
+Debes 716
+Liquidas hoy con 550
+Abono mensual 72
+Último abono en línea 01/nov/
+26
+''';
+    final s = parseStatement(text, today: DateTime(2026, 11, 25));
+    expect(s.groups.length, 2);
+    final a = s.forGroup(0), b = s.forGroup(1);
+    expect(a.institution, 'Att unefon baña');
+    expect(a.totalPending, 307900);
+    expect(a.info.single!.payment, 44000);
+    expect(a.info.single!.lastPayment, DateTime(2026, 11, 21));
+    expect(a.payments.first.date, DateTime(2026, 12, 21));
+    expect(b.institution, 'Audifono');
+    expect(b.totalPending, 71600);
+    expect(b.info.single!.payment, 7200);
+    expect(b.payments.first.date, DateTime(2026, 12, 1));
+  });
 }

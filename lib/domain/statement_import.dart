@@ -491,6 +491,13 @@ class _Card {
   bool get hasData => values.isNotEmpty;
 }
 
+/// El nombre como se ve en la captura, sin el ruido de iconos ni el importe pegado.
+String _cleanName(String raw) => raw
+    .replaceFirst(RegExp(r'\s*(\$|MXN|mxn).*$'), '')
+    .replaceFirst(RegExp(r'^(?:[^A-Za-zÁÉÍÓÚÑáéíóúñ0-9]+|[A-Za-z] (?=[A-Za-zÁÉÍÓÚÑáéíóúñ]{2}))+'), '')
+    .replaceFirst(RegExp(r'[^A-Za-zÁÉÍÓÚÑáéíóúñ0-9]+$'), '')
+    .trim();
+
 DateTime _addPeriod(DateTime d, String? freq, int n) {
   switch (freq) {
     case 'quincenal':
@@ -529,7 +536,13 @@ ParsedStatement? _parseSummary(List<String> rawLines, DateTime today) {
   for (final rl in rawLines) {
     final raw = rl.trim();
     if (raw.isEmpty) continue;
-    final t = normalize(_ocrClean(raw)).replaceAll(RegExp(r'\s+'), ' ');
+    // Quita ruido de iconos al inicio y al final («e Att unefon», «€ Estado de cuenta "»).
+    final t = normalize(_ocrClean(raw))
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .replaceFirst(RegExp(r'^(?:[^a-z0-9$]+|[a-z] (?=[a-z]{2}))+'), '')
+        .replaceFirst(RegExp(r'''[^a-z0-9/]+$'''), '')
+        .trim();
+    if (t.isEmpty) continue;
     var c = cards.last;
     (_Key, RegExpMatch)? label;
     for (final (k, re) in _summaryLabels) {
@@ -541,6 +554,12 @@ ParsedStatement? _parseSummary(List<String> rawLines, DateTime today) {
     }
     if (label != null) {
       final (k, m) = label;
+      // Una etiqueta que ya tiene valor (otro «Debes», otra «Fecha de compra»)
+      // es el inicio de la siguiente tarjeta aunque no se haya leído su título.
+      if (k != _Key.payment && c.values.containsKey(_Key.total) && (c.values.containsKey(k) || c.queue.contains(k))) {
+        c = _Card();
+        cards.add(c);
+      }
       if (k == _Key.payment) c.sawPayment = true;
       if (k == _Key.payment) c.freq ??= _reFreq.firstMatch(m[0]!)?[1]?.replaceAll('mensualidad', 'mensual');
       // Valor en la misma línea («Debes 3,079»): lo que sigue a la etiqueta.
@@ -558,13 +577,15 @@ ParsedStatement? _parseSummary(List<String> rawLines, DateTime today) {
       continue;
     }
     if (assign(c, t)) continue;
-    // Una línea con letras y sin números: título de una nueva tarjeta.
-    if (!RegExp(r'\d').hasMatch(t) && RegExp(r'[a-z]{2}').hasMatch(t) && t.length <= 40 && !_reHeader.hasMatch(t)) {
+    // Una línea con letras (y quizá el abono pegado, «Audifono $72»): título
+    // de una nueva tarjeta.
+    final title = t.replaceFirst(RegExp(r'\s*(\$|mxn).*$'), '').trim();
+    if (!RegExp(r'\d').hasMatch(title) && RegExp(r'[a-z]{2}').hasMatch(title) && title.length <= 40 && !_reHeader.hasMatch(title)) {
       if (c.hasData || c.queue.isNotEmpty) {
         c = _Card();
         cards.add(c);
       }
-      c.name = raw;
+      c.name = _cleanName(raw);
     }
   }
 
@@ -618,11 +639,23 @@ class ProposedChange {
 Debt? matchDebt(Ledger l, ParsedStatement s) {
   if (s.institution == null) return null;
   final inst = normalize(s.institution!);
+  final instWords = inst.split(RegExp(r'[^a-z0-9]+')).where((w) => w.length >= 3).toList();
+  bool same(String a, String b) => a == b || (a.length >= 4 && b.length >= 4 && (a.startsWith(b) || b.startsWith(a)));
+  Debt? best;
+  var bestScore = 0;
   for (final d in l.debts.where((d) => d.status == DebtStatus.active)) {
     final n = normalize(d.name);
-    if (n.contains(inst) || inst.contains(n.split(' ').first)) return d;
+    var score = n.contains(inst) || inst.contains(n) ? 10 : 0;
+    // Palabras en común («Audifono» ↔ «Coppel Audífonos»).
+    for (final w in n.split(RegExp(r'[^a-z0-9]+')).where((w) => w.length >= 3)) {
+      if (instWords.any((x) => same(x, w))) score += 2;
+    }
+    if (score > bestScore) {
+      best = d;
+      bestScore = score;
+    }
   }
-  return null;
+  return best;
 }
 
 /// Compara lo detectado con las cuotas abiertas de [debt]:
