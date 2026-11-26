@@ -13,6 +13,7 @@ import 'data/sync_scope.dart';
 import 'data/sync_service.dart';
 import 'data/notification_service.dart';
 import 'data/app_lock.dart';
+import 'data/widget_service.dart';
 import 'ui/lock_screen.dart';
 import 'ui/notifications_screen.dart';
 import 'ui/shell.dart';
@@ -33,10 +34,7 @@ Future<void> main() async {
   SyncService? sync;
   AuthService? auth;
   try {
-    await Supabase.initialize(
-      url: SupabaseConfig.url,
-      publishableKey: SupabaseConfig.publishableKey,
-    );
+    await Supabase.initialize(url: SupabaseConfig.url, publishableKey: SupabaseConfig.publishableKey);
     final client = Supabase.instance.client;
     auth = AuthService(client.auth);
     final remote = SupabaseSyncRemote(client);
@@ -56,8 +54,18 @@ Future<void> main() async {
     notifications = null;
   }
 
+  // Widget de calendario en la pantalla de inicio (Android).
+  WidgetService? homeWidget = WidgetService(state, theme);
+  try {
+    await homeWidget.init();
+  } catch (e) {
+    debugPrint('Widget no disponible: $e');
+    homeWidget = null;
+  }
+
   runApp(
     DragoApp(
+      homeWidget: homeWidget,
       state: state,
       theme: theme,
       lock: lock,
@@ -68,11 +76,7 @@ Future<void> main() async {
   );
 }
 
-void _wireSync(
-  SupabaseClient client,
-  SupabaseSyncRemote remote,
-  SyncService sync,
-) {
+void _wireSync(SupabaseClient client, SupabaseSyncRemote remote, SyncService sync) {
   client.auth.onAuthStateChange.listen((data) {
     switch (data.event) {
       case AuthChangeEvent.initialSession:
@@ -113,14 +117,8 @@ Future<void> _askNewPassword(SupabaseClient client) async {
         decoration: const InputDecoration(labelText: 'Al menos 8 caracteres'),
       ),
       actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(d),
-          child: const Text('Cancelar'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.pop(d, c.text),
-          child: const Text('Guardar'),
-        ),
+        TextButton(onPressed: () => Navigator.pop(d), child: const Text('Cancelar')),
+        FilledButton(onPressed: () => Navigator.pop(d, c.text), child: const Text('Guardar')),
       ],
     ),
   );
@@ -129,15 +127,12 @@ Future<void> _askNewPassword(SupabaseClient client) async {
     await client.auth.updateUser(UserAttributes(password: pass));
     final ctx = navigatorKey.currentContext;
     if (ctx != null && ctx.mounted) {
-      ScaffoldMessenger.of(
-        ctx,
-      ).showSnackBar(const SnackBar(content: Text('Contraseña actualizada')));
+      ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Contraseña actualizada')));
     }
   } on AuthException catch (e) {
     final ctx = navigatorKey.currentContext;
     if (ctx != null && ctx.mounted) {
-      ScaffoldMessenger.of(ctx)
-          .showSnackBar(SnackBar(content: Text(e.message)));
+      ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(e.message)));
     }
   }
 }
@@ -149,7 +144,9 @@ class DragoApp extends StatelessWidget {
   final SyncService? sync;
   final AuthService? auth;
   final NotificationService? notifications;
+  final WidgetService? homeWidget;
   const DragoApp({
+    this.homeWidget,
     super.key,
     required this.state,
     required this.theme,
@@ -170,24 +167,23 @@ class DragoApp extends StatelessWidget {
           auth: auth,
           child: NotificationScope(
             service: notifications,
-            child: ThemeScope(
-              controller: theme,
-              child: ListenableBuilder(
-                listenable: theme,
-                builder: (context, _) => MaterialApp(
-                  navigatorKey: navigatorKey,
-                  title: 'Drago',
-                  debugShowCheckedModeBanner: false,
-                  locale: const Locale('es', 'MX'),
-                  supportedLocales: const [
-                    Locale('es', 'MX'),
-                    Locale('es'),
-                    Locale('en'),
-                  ],
-                  localizationsDelegates: GlobalMaterialLocalizations.delegates,
-                  theme: theme.theme.data,
-                  home: const AppShell(),
-                  builder: (context, child) => LockGate(child: child!),
+            child: WidgetScope(
+              service: homeWidget,
+              child: ThemeScope(
+                controller: theme,
+                child: ListenableBuilder(
+                  listenable: theme,
+                  builder: (context, _) => MaterialApp(
+                    navigatorKey: navigatorKey,
+                    title: 'Drago',
+                    debugShowCheckedModeBanner: false,
+                    locale: const Locale('es', 'MX'),
+                    supportedLocales: const [Locale('es', 'MX'), Locale('es'), Locale('en')],
+                    localizationsDelegates: GlobalMaterialLocalizations.delegates,
+                    theme: theme.theme.data,
+                    home: const AppShell(),
+                    builder: (context, child) => LockGate(child: child!),
+                  ),
                 ),
               ),
             ),

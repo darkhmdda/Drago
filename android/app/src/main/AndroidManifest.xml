@@ -36,6 +36,15 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        <!-- Widget de calendario en la pantalla de inicio. -->
+        <receiver android:name=".DragoCalendarWidget" android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/drago_calendar_widget_info" />
+        </receiver>
         <!-- Recordatorios programados (flutter_local_notifications). -->
         <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" />
         <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver">

@@ -1,5 +1,8 @@
 import 'package:material_ui/material_ui.dart';
 
+import '../data/app_state.dart';
+import '../data/widget_service.dart';
+
 import 'assistant_screen.dart';
 import 'calendar_screen.dart';
 import 'debts_screen.dart';
@@ -19,6 +22,44 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   int _index = 0;
+  final _calendarFocus = ValueNotifier<DateTime?>(null);
+  WidgetService? _widget;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final w = WidgetScope.of(context);
+    if (w != _widget) {
+      _widget?.launches.removeListener(_onWidgetLaunch);
+      _widget = w;
+      w?.launches.addListener(_onWidgetLaunch);
+      if (w?.launches.value != null) WidgetsBinding.instance.addPostFrameCallback((_) => _onWidgetLaunch());
+    }
+  }
+
+  @override
+  void dispose() {
+    _widget?.launches.removeListener(_onWidgetLaunch);
+    super.dispose();
+  }
+
+  /// Toque en el widget de la pantalla de inicio: abre el día o la deuda.
+  void _onWidgetLaunch() {
+    final uri = _widget?.launches.value;
+    if (uri == null || !mounted) return;
+    _widget!.launches.value = null;
+    final date = DateTime.tryParse(uri.queryParameters['date'] ?? '');
+    Navigator.of(context).popUntil((r) => r.isFirst);
+    final debtId = uri.queryParameters['id'];
+    if (uri.host == 'debt' && debtId != null && AppScope.of(context).ledger.debts.any((d) => d.id == debtId)) {
+      setState(() => _index = 1);
+      Navigator.push(context, MaterialPageRoute(builder: (_) => DebtDetailScreen(debtId: debtId)));
+    } else {
+      setState(() => _index = 2);
+      _calendarFocus.value = null;
+      _calendarFocus.value = date ?? DateTime.now();
+    }
+  }
 
   static const _titles = ['Inicio', 'Deudas y pagos', 'Calendario', 'Movimientos', 'Reportes'];
   static const _destinations = [
@@ -35,7 +76,7 @@ class _AppShellState extends State<AppShell> {
     final pages = [
       HomeScreen(onOpenDebts: () => setState(() => _index = 1), onOpenCalendar: () => setState(() => _index = 2)),
       const DebtsScreen(),
-      const CalendarScreen(),
+      CalendarScreen(focus: _calendarFocus),
       const MovementsScreen(),
       const ReportsScreen(),
     ];

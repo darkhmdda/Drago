@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Widget de calendario de Drago. Chico (4×2): próximos movimientos.
+     Grande (4×4): mes completo + próximos movimientos. -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="250dp"
+    android:minHeight="110dp"
+    android:minResizeWidth="180dp"
+    android:minResizeHeight="110dp"
+    android:targetCellWidth="4"
+    android:targetCellHeight="2"
+    android:maxResizeWidth="600dp"
+    android:maxResizeHeight="600dp"
+    android:resizeMode="horizontal|vertical"
+    android:updatePeriodMillis="1800000"
+    android:initialLayout="@layout/widget_calendar"
+    android:previewLayout="@layout/widget_calendar"
+    android:description="@string/widget_description"
+    android:widgetCategory="home_screen" />

@@ -1,4 +1,5 @@
 import 'package:intl/intl.dart';
+import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../data/app_state.dart';
@@ -13,7 +14,9 @@ enum CalendarView { month, week, agenda }
 
 /// Calendario financiero: vista mensual, semanal y agenda de próximos eventos.
 class CalendarScreen extends StatefulWidget {
-  const CalendarScreen({super.key});
+  /// Día a mostrar cuando se abre desde el widget de la pantalla de inicio.
+  final ValueListenable<DateTime?>? focus;
+  const CalendarScreen({super.key, this.focus});
   @override
   State<CalendarScreen> createState() => _CalendarScreenState();
 }
@@ -21,6 +24,28 @@ class CalendarScreen extends StatefulWidget {
 class _CalendarScreenState extends State<CalendarScreen> {
   var _view = CalendarView.month;
   late DateTime _selected = dayOf(DateTime.now());
+
+  @override
+  void initState() {
+    super.initState();
+    widget.focus?.addListener(_onFocus);
+    _onFocus();
+  }
+
+  @override
+  void dispose() {
+    widget.focus?.removeListener(_onFocus);
+    super.dispose();
+  }
+
+  void _onFocus() {
+    final d = widget.focus?.value;
+    if (d == null) return;
+    setState(() {
+      _selected = dayOf(d);
+      _view = CalendarView.month;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {

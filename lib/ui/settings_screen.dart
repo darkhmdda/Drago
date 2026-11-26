@@ -18,6 +18,7 @@ import 'notifications_screen.dart';
 import 'lock_screen.dart';
 import '../data/app_lock.dart';
 import '../domain/reminders.dart';
+import '../data/widget_service.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -57,6 +58,10 @@ class SettingsScreen extends StatelessWidget {
       const _SecuritySection(),
       const SectionTitle('Recordatorios'),
       const _ReminderSettings(),
+      if (WidgetService.supported) ...[
+        const SectionTitle('Widget de calendario'),
+        const _WidgetSettings(),
+      ],
       const SectionTitle('Apariencia'),
       const _ThemePicker(),
       const SectionTitle('Respaldo'),
@@ -374,6 +379,34 @@ class _ThemeCard extends StatelessWidget {
           ]),
         ),
       ),
+    );
+  }
+}
+
+class _WidgetSettings extends StatelessWidget {
+  const _WidgetSettings();
+
+  @override
+  Widget build(BuildContext context) {
+    final w = WidgetScope.of(context);
+    if (w == null) return const SizedBox.shrink();
+    return Card(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        SwitchListTile(
+          title: const Text('Ocultar importes en el widget'),
+          subtitle: const Text('En la pantalla de inicio solo se verán los nombres y los puntos de color, sin cantidades.'),
+          value: w.hideAmounts,
+          onChanged: w.setHideAmounts,
+        ),
+        const Padding(
+          padding: EdgeInsets.fromLTRB(16, 0, 16, 12),
+          child: Text(
+            'Para agregarlo: mantén presionado un espacio vacío de la pantalla de inicio → Widgets → Drago. '
+            'Cámbiale el tamaño para ver solo los próximos pagos o el mes completo.',
+            style: TextStyle(fontSize: 13),
+          ),
+        ),
+      ]),
     );
   }
 }
