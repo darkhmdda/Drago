@@ -26,7 +26,19 @@ class _ImportScreenState extends State<ImportScreen> {
   bool _reading = false;
   String? _text;
   String? _error;
+  String? _errorDetail;
   ParsedStatement? _parsed;
+
+  /// Bloque elegido cuando el texto trae varias deudas.
+  int _group = 0;
+  final _doneGroups = <int>{};
+
+  /// Lo que se compara: el bloque elegido (o todo si hay un solo bloque).
+  ParsedStatement? get _current {
+    final p = _parsed;
+    if (p == null || p.groups.isEmpty) return p;
+    return p.forGroup(_group.clamp(0, p.groups.length - 1));
+  }
   String? _debtId;
   final _selected = <int>{};
   bool _updateTotal = false;
@@ -44,12 +56,16 @@ class _ImportScreenState extends State<ImportScreen> {
     setState(() {
       _reading = true;
       _error = null;
+      _errorDetail = null;
     });
     try {
       final text = await recognizeText(image);
       _analyze(text);
     } catch (e) {
-      setState(() => _error = 'No se pudo leer la imagen: $e');
+      setState(() {
+        _error = 'No se pudo leer la imagen con el lector del teléfono. Intenta de nuevo o usa «Pegar texto».';
+        _errorDetail = '$e';
+      });
     } finally {
       if (mounted) setState(() => _reading = false);
     }
@@ -81,20 +97,42 @@ class _ImportScreenState extends State<ImportScreen> {
   void _analyze(String text) {
     final l = AppScope.of(context).ledger;
     final parsed = parseStatement(text, today: l.today, extraNames: l.debts.map((d) => d.name).toList());
-    final match = widget.debtId ?? matchDebt(l, parsed)?.id;
     setState(() {
       _text = text;
       _parsed = parsed;
-      _debtId = match ?? (l.debts.any((d) => d.status == DebtStatus.active) ? null : _newDebt);
-      _newName.text = parsed.institution ?? '';
-      _updateTotal = false;
-      _resetSelection();
+      _doneGroups.clear();
+      _selectGroup(0);
     });
+  }
+
+  void _selectGroup(int i) {
+    final l = AppScope.of(context).ledger;
+    final p = _parsed!;
+    _group = i;
+    final block = p.groups.isEmpty ? const <DetectedPayment>[] : p.groups[i];
+    final match = widget.debtId ?? (p.groups.length > 1 ? suggestDebt(l, block)?.id : null) ?? matchDebt(l, p)?.id ?? suggestDebt(l, block)?.id;
+    _debtId = match ?? (l.debts.any((d) => d.status == DebtStatus.active) ? null : _newDebt);
+    _newName.text = p.institution ?? '';
+    _updateTotal = false;
+    _resetSelection();
+  }
+
+  /// Tras aplicar un bloque: pasa al siguiente pendiente, o cierra si ya no hay.
+  void _blockDone() {
+    final p = _parsed!;
+    _doneGroups.add(_group);
+    final next = [for (var i = 0; i < p.groups.length; i++) i].where((i) => !_doneGroups.contains(i)).firstOrNull;
+    if (next == null) {
+      Navigator.pop(context);
+    } else {
+      setState(() => _selectGroup(next));
+      showMessage(context, 'Listo. Ahora el bloque ${next + 1} de ${p.groups.length}.');
+    }
   }
 
   List<ProposedChange> _changes() {
     final l = AppScope.of(context).ledger;
-    final p = _parsed;
+    final p = _current;
     if (p == null || _debtId == null || _debtId == _newDebt) return const [];
     final d = l.debts.where((x) => x.id == _debtId).firstOrNull;
     return d == null ? const [] : compareWithDebt(l, d, p);
@@ -111,7 +149,8 @@ class _ImportScreenState extends State<ImportScreen> {
   @override
   Widget build(BuildContext context) {
     final l = AppScope.of(context).ledger;
-    final p = _parsed;
+    final p = _current;
+    final all = _parsed;
     return Scaffold(
       appBar: AppBar(title: const Text('Importar captura')),
       body: PageBody(children: [
@@ -142,7 +181,15 @@ class _ImportScreenState extends State<ImportScreen> {
             padding: EdgeInsets.all(24),
             child: Column(children: [CircularProgressIndicator(), SizedBox(height: 8), Text('Leyendo la imagen…')]),
           ),
-        if (_error != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error))),
+        if (_error != null) ...[
+          Padding(padding: const EdgeInsets.only(top: 12), child: Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error))),
+          if (_errorDetail != null)
+            ExpansionTile(
+              tilePadding: EdgeInsets.zero,
+              title: const Text('Ver detalle técnico', style: TextStyle(fontSize: 13)),
+              children: [SelectableText(_errorDetail!, style: const TextStyle(fontSize: 11))],
+            ),
+        ],
         if (p != null && !_reading) ...[
           const SectionTitle('Detectado'),
           if (p.isEmpty)
@@ -154,6 +201,20 @@ class _ImportScreenState extends State<ImportScreen> {
               ),
             )
           else ...[
+            if (all != null && all.groups.length > 1) ...[
+              Text('Encontré ${all.groups.length} bloques de pagos (probablemente deudas distintas). Revisa uno por uno:'),
+              const SizedBox(height: 8),
+              Wrap(spacing: 8, runSpacing: 8, children: [
+                for (var i = 0; i < all.groups.length; i++)
+                  ChoiceChip(
+                    avatar: _doneGroups.contains(i) ? const Icon(Icons.check, size: 18) : null,
+                    label: Text('Bloque ${i + 1} · ${all.groups[i].length} × ${formatMoney(all.groups[i].first.amount)}'),
+                    selected: _group == i,
+                    onSelected: (_) => setState(() => _selectGroup(i)),
+                  ),
+              ]),
+              gap,
+            ],
             Card(
               child: Column(children: [
                 ListTile(dense: true, title: const Text('Institución'), trailing: Text(p.institution ?? 'No identificada')),
@@ -164,6 +225,7 @@ class _ImportScreenState extends State<ImportScreen> {
             ),
             gap,
             DropdownButtonFormField<String>(
+              key: ValueKey('deuda-$_group-$_debtId'),
               initialValue: _debtId,
               isExpanded: true,
               decoration: const InputDecoration(labelText: 'Comparar con la deuda', border: OutlineInputBorder()),
@@ -217,7 +279,10 @@ class _ImportScreenState extends State<ImportScreen> {
                   : null,
               controlAffinity: ListTileControlAffinity.leading,
               title: Row(children: [
-                Expanded(flex: 3, child: Text('${debt.name.split(' ').first} ${fmtShortDate(c.detected.date)}')),
+                Expanded(
+                    flex: 3,
+                    child: Text('${c.detected.number == null ? debt.name.split(' ').first : 'Cuota ${c.detected.number}'} · '
+                        '${fmtShortDate(c.detected.date)}')),
                 Expanded(flex: 2, child: Text(c.before == null ? '—' : formatMoney(c.before!), textAlign: TextAlign.right)),
                 Expanded(
                   flex: 2,
@@ -296,7 +361,7 @@ class _ImportScreenState extends State<ImportScreen> {
                   ),
                   success: 'Deuda creada',
                 );
-                if (ok && mounted) Navigator.pop(context);
+                if (ok && mounted) _blockDone();
               },
         icon: const Icon(Icons.add),
         label: const Text('Crear deuda'),
@@ -309,7 +374,7 @@ class _ImportScreenState extends State<ImportScreen> {
     final lines = [
       for (final c in chosen)
         c.kind == ChangeKind.newInstallment
-            ? 'Nueva cuota: ${fmtShortDate(c.detected.date)} · ${formatMoney(c.detected.amount)}'
+            ? 'Nueva cuota${c.detected.number == null ? '' : ' ${c.detected.number}'}: ${fmtShortDate(c.detected.date)} · ${formatMoney(c.detected.amount)}'
             : '${fmtShortDate(c.detected.date)}: ${formatMoney(c.before!)} → ${formatMoney(c.detected.amount)}',
       if (newTotal != null) 'Monto total: ${formatMoney(newTotal)}',
     ];
@@ -319,6 +384,6 @@ class _ImportScreenState extends State<ImportScreen> {
       applyChanges(l, l.debt(debtId), chosen);
       if (newTotal != null) l.updateDebt(debtId, total: newTotal);
     }, success: 'Cambios aplicados');
-    if (ok && mounted) Navigator.pop(context);
+    if (ok && mounted) _blockDone();
   }
 }

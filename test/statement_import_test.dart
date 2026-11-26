@@ -44,6 +44,46 @@ Saldo pendiente
       expect(s.payments.single.amount, 75000);
     });
 
+    test('Texto real del usuario: fechas «16/dic/2026», «2 de 6» y tres deudas en un solo texto', () {
+      const text = '''Imagen 1
+Detalle de las mensualidades (A pagar)
+ * 2 de 6 — Vence el 16/dic/2026: \$ 21.12
+ * 3 de 6 — Vence el 18/ene/2027: \$ 21.12
+ * 4 de 6 — Vence el 16/feb/2027: \$ 21.12
+ * 5 de 6 — Vence el 16/mar/2027: \$ 21.12
+ * 6 de 6 — Vence el 16/abr/2027: \$ 21.12
+Imagen 2
+Detalle de las mensualidades (A pagar)
+ * 3 de 6 — Vence el 16/feb/2027: \$ 4.46
+ * 4 de 6 — Vence el 16/mar/2027: \$ 4.46
+ * 5 de 6 — Vence el 16/abr/2027: \$ 4.46
+ * 6 de 6 — Vence el 17/may/2027: \$ 4.46
+Imagen 3
+Detalle de las mensualidades (A pagar)
+ * 4 de 6 — Vence el 16/dic/2026: \$ 301.41
+ * 5 de 6 — Vence el 18/ene/2027: \$ 301.41
+ * 6 de 6 — Vence el 16/feb/2027: \$ 301.41''';
+      final s = parseStatement(text, today: today);
+      expect(s.groups.length, 3);
+      expect(s.groups.map((g) => g.length), [5, 4, 3]);
+      final g1 = s.groups[0];
+      expect(g1.first.date, DateTime(2026, 12, 16));
+      expect(g1.first.amount, 2112);
+      expect(g1.first.number, 2);
+      expect(g1.first.of, 6);
+      expect(g1.last.date, DateTime(2027, 4, 16));
+      expect(s.groups[1].last.date, DateTime(2027, 5, 17));
+      expect(s.groups[1].first.amount, 446);
+      expect(s.groups[2].map((p) => p.amount).toSet(), {30141});
+    });
+
+    test('Otros formatos de fecha: 16-dic-26 y «16 de diciembre del 2026»', () {
+      final a = parseStatement('Pago 16-dic-26 \$100.00', today: today);
+      expect(a.payments.single.date, DateTime(2026, 12, 16));
+      final b = parseStatement('Vence el 16 de diciembre del 2026\n\$250.00', today: today);
+      expect(b.payments.single.date, DateTime(2026, 12, 16));
+    });
+
     test('Texto sin pagos', () {
       expect(parseStatement('Hola mundo', today: today).isEmpty, isTrue);
     });
@@ -77,6 +117,13 @@ Saldo pendiente
       expect(l.installmentsOf(d.id).first.amount, 79639);
       applyChanges(l, d, [c.first]); // solo la primera
       expect(l.installmentsOf(d.id).map((i) => i.amount), [76331, 67447, 12000]);
+    });
+
+    test('Sin fecha cercana, se empareja por número de cuota', () {
+      final s = parseStatement('Coppel\n3 de 6 — Vence el 20/ene/2027: \$130.00', today: today);
+      final c = compareWithDebt(l, l.debts.single, s);
+      expect(c.single.kind, ChangeKind.update);
+      expect(c.single.installment!.number, 3);
     });
 
     test('Cuotas pagadas no se tocan', () {

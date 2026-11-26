@@ -8,18 +8,35 @@ class DetectedPayment {
   final DateTime date;
   final Cents amount;
   final String line;
-  const DetectedPayment(this.date, this.amount, this.line);
+
+  /// Número de cuota si la captura lo indica («2 de 6» → 2).
+  final int? number;
+
+  /// Total de cuotas si la captura lo indica («2 de 6» → 6).
+  final int? of;
+  const DetectedPayment(this.date, this.amount, this.line, {this.number, this.of});
 }
 
 /// Lo que se pudo leer de una captura de estado de cuenta.
 class ParsedStatement {
   final String? institution;
-  final List<DetectedPayment> payments;
+
+  /// Bloques de pagos. Si el texto trae varias deudas (por ejemplo, varias
+  /// capturas pegadas juntas), cada una queda en su propio bloque: se detecta
+  /// cuando la numeración de cuotas vuelve a empezar («6 de 6» → «3 de 6»).
+  final List<List<DetectedPayment>> groups;
 
   /// Saldo o total pendiente que menciona la captura, si lo hay.
   final Cents? totalPending;
-  const ParsedStatement({this.institution, this.payments = const [], this.totalPending});
-  bool get isEmpty => payments.isEmpty && totalPending == null;
+  const ParsedStatement({this.institution, this.groups = const [], this.totalPending});
+
+  /// Todos los pagos detectados (de todos los bloques).
+  List<DetectedPayment> get payments => [for (final g in groups) ...g];
+  bool get isEmpty => groups.every((g) => g.isEmpty) && totalPending == null;
+
+  /// Solo un bloque (el total pendiente aplica únicamente si hay un solo bloque).
+  ParsedStatement forGroup(int i) =>
+      ParsedStatement(institution: institution, groups: [groups[i]], totalPending: groups.length == 1 ? totalPending : null);
 }
 
 const _monthNames = {
@@ -32,7 +49,12 @@ const knownInstitutions = ['DiDi', 'Mercado Pago', 'Coppel', 'Nu', 'BBVA', 'Bana
   'Kueski', 'Elektra', 'Liverpool', 'Aplazo', 'Baubap', 'Plata', 'Spin', 'HSBC', 'Banco Azteca'];
 
 final _monthAlt = _monthNames.keys.toList()..sort((a, b) => b.length.compareTo(a.length));
-final _reDayMonth = RegExp(r'\b(\d{1,2})\s*(?:de\s+)?(' + _monthAlt.join('|') + r')\.?(?:\s*(?:de\s+)?(\d{4}))?\b');
+// «16 dic», «16 de diciembre de 2026», «16/dic/2026», «16-dic-26».
+final _reDayMonth = RegExp(r'\b(\d{1,2})\s*[/\-.]?\s*(?:de\s+)?(' +
+    _monthAlt.join('|') +
+    r')\.?(?:\s*[/\-.]?\s*(?:de(?:l)?\s+)?(\d{4}|\d{2}(?!\d)))?(?![a-z])');
+// «2 de 6», «cuota 3 de 12», «pago 4/6».
+final _reCuota = RegExp(r'\b(?:cuota|pago|mensualidad|parcialidad)?\s*(\d{1,2})\s*(?:de|/)\s*(\d{1,2})\b(?!\s*[/\-.]\s*\d)');
 final _reMonthDay = RegExp(r'\b(' + _monthAlt.join('|') + r')\.?\s+(\d{1,2})(?:,?\s*(\d{4}))?\b');
 final _reNumeric = RegExp(r'\b(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})\b');
 // Importes con centavos o con signo de pesos (para no confundir días o folios con dinero).
@@ -51,7 +73,8 @@ List<DateTime> _dates(String t, DateTime today) {
   final out = <DateTime>[];
   for (final m in _reDayMonth.allMatches(t)) {
     final d = int.parse(m.group(1)!);
-    if (d >= 1 && d <= 31) out.add(_infer(d, _monthNames[m.group(2)]!, int.tryParse(m.group(3) ?? ''), today));
+    final y = int.tryParse(m.group(3) ?? '');
+    if (d >= 1 && d <= 31) out.add(_infer(d, _monthNames[m.group(2)]!, y == null ? null : (y < 100 ? 2000 + y : y), today));
   }
   if (out.isEmpty) {
     for (final m in _reMonthDay.allMatches(t)) {
@@ -131,16 +154,44 @@ ParsedStatement parseStatement(String text, {required DateTime today, List<Strin
     }
     if (ms.isEmpty) continue;
     usedMoney.add(src);
-    payments.add(DetectedPayment(ds.first, ms.first, lines[i] == lines[src] ? lines[i] : '${lines[i]} · ${lines[src]}'));
+    final cuota = _reCuota.firstMatch(t.replaceAll(RegExp(r'\d{1,2}\s*[/\-.]\s*\d{1,2}\s*[/\-.]\s*\d{2,4}'), ' '));
+    int? number, of;
+    if (cuota != null) {
+      final a = int.parse(cuota.group(1)!), b = int.parse(cuota.group(2)!);
+      if (a >= 1 && a <= b && b <= 60) {
+        number = a;
+        of = b;
+      }
+    }
+    payments.add(DetectedPayment(ds.first, ms.first, lines[i] == lines[src] ? lines[i] : '${lines[i]} · ${lines[src]}',
+        number: number, of: of));
   }
 
-  // Sin duplicados (misma fecha e importe) y en orden.
-  final seen = <String>{};
-  final unique = [
-    for (final p in payments..sort((a, b) => a.date.compareTo(b.date)))
-      if (seen.add('${p.date}|${p.amount}')) p,
+  // Bloques: uno nuevo cada vez que la numeración de cuotas vuelve a empezar
+  // o cambia el total de cuotas (otra deuda).
+  final groups = <List<DetectedPayment>>[];
+  DetectedPayment? prev;
+  for (final p in payments) {
+    final restart = prev != null &&
+        p.number != null &&
+        prev.number != null &&
+        (p.number! <= prev.number! || (p.of != null && prev.of != null && p.of != prev.of));
+    if (groups.isEmpty || restart) groups.add([]);
+    groups.last.add(p);
+    prev = p;
+  }
+  // En cada bloque: sin duplicados (misma fecha e importe) y en orden.
+  final clean = [
+    for (final g in groups)
+      () {
+        final seen = <String>{};
+        return [
+          for (final p in g..sort((a, b) => a.date.compareTo(b.date)))
+            if (seen.add('${p.date}|${p.amount}')) p,
+        ];
+      }(),
   ];
-  return ParsedStatement(institution: institution, payments: unique, totalPending: total);
+  return ParsedStatement(institution: institution, groups: clean, totalPending: total);
 }
 
 // ---------------------------------------------------------------------------
@@ -189,6 +240,10 @@ List<ProposedChange> compareWithDebt(Ledger l, Debt debt, ParsedStatement s) {
         bestGap = gap;
       }
     }
+    // Sin fecha cercana: si la captura dice el número de cuota, se usa ese.
+    if (best == null && p.number != null) {
+      best = open.where((i) => i.number == p.number && !used.contains(i.id)).firstOrNull;
+    }
     if (best == null) {
       // ¿Corresponde a una cuota ya pagada? Entonces no se propone nada.
       final paid = l.installmentsOf(debt.id).where((i) =>
@@ -217,4 +272,27 @@ void applyChanges(Ledger l, Debt debt, List<ProposedChange> changes) {
         break;
     }
   }
+}
+
+/// Sugiere la deuda que mejor coincide con un bloque de pagos: la que tiene
+/// más cuotas con fecha cercana (±3 días) o mismo número, y mismo importe.
+Debt? suggestDebt(Ledger l, List<DetectedPayment> block) {
+  Debt? best;
+  var bestScore = 0;
+  for (final d in l.debts.where((d) => d.status == DebtStatus.active)) {
+    final insts = l.installmentsOf(d.id);
+    var score = 0;
+    for (final p in block) {
+      final hit = insts.any((i) =>
+          (i.dueDate.difference(p.date).inDays.abs() <= 3 || (p.number != null && i.number == p.number)) &&
+          i.amount == p.amount);
+      final near = insts.any((i) => i.dueDate.difference(p.date).inDays.abs() <= 3);
+      score += hit ? 3 : (near ? 1 : 0);
+    }
+    if (score > bestScore) {
+      best = d;
+      bestScore = score;
+    }
+  }
+  return best;
 }
