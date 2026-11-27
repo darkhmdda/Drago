@@ -63,16 +63,16 @@ extension AppThemeInfo on AppTheme {
       };
 
   String get description => switch (this) {
-        AppTheme.classic => 'Verde y claro, el tema original',
-        AppTheme.classicDark => 'El tema original en modo oscuro',
+        AppTheme.classic => 'Índigo y menta, estilo banco digital',
+        AppTheme.classicDark => 'Índigo y menta en modo oscuro',
         AppTheme.ryusui => 'Dorado, rojo vino y azul',
         AppTheme.nami => 'Naranja, durazno y azul cielo',
       };
 
   /// Colores de la paleta original (para la vista previa en Ajustes).
   List<Color> get swatch => switch (this) {
-        AppTheme.classic => const [Color(0xFF1F6F5C), Color(0xFFA0F0D9), Color(0xFF1B8A5A), Color(0xFFC0392B), Color(0xFFF4FBF8)],
-        AppTheme.classicDark => const [Color(0xFF1F6F5C), Color(0xFF84D6BE), Color(0xFF4CC38A), Color(0xFFFF6B5E), Color(0xFF0F1513)],
+        AppTheme.classic => const [Color(0xFF4338CA), Color(0xFFE0E7FF), Color(0xFF10B981), Color(0xFFE11D48), Color(0xFFF6F7FB)],
+        AppTheme.classicDark => const [Color(0xFFA5B4FC), Color(0xFF312E81), Color(0xFF34D399), Color(0xFFFB7185), Color(0xFF11121A)],
         AppTheme.ryusui => const [
             Color(0xFFE8B84C), Color(0xFFF5D77A), Color(0xFFC9272C), Color(0xFF751A24),
             Color(0xFFD9C29B), Color(0xFF2455A4), Color(0xFFE77A27), Color(0xFF65402D),
@@ -91,32 +91,92 @@ extension AppThemeInfo on AppTheme {
       };
 }
 
-const _classicSeed = Color(0xFF1F6F5C);
-
+/// Clásico (fintech moderno): índigo como color principal y menta como acento,
+/// fondos fríos y limpios, tarjetas planas con borde fino.
 ThemeData _classic(Brightness b) {
   final light = b == Brightness.light;
+  const indigo = Color(0xFF4338CA);
+  final scheme = light
+      ? ColorScheme.fromSeed(seedColor: indigo).copyWith(
+          primary: indigo,
+          onPrimary: Colors.white,
+          primaryContainer: const Color(0xFFE0E7FF),
+          onPrimaryContainer: const Color(0xFF1E1B4B),
+          secondary: const Color(0xFF047857),
+          onSecondary: Colors.white,
+          secondaryContainer: const Color(0xFFD1FAE5),
+          onSecondaryContainer: const Color(0xFF064E3B),
+          tertiary: const Color(0xFF7C3AED),
+          onTertiary: Colors.white,
+          error: const Color(0xFFDC2626),
+          errorContainer: const Color(0xFFFFE4E6),
+          onErrorContainer: const Color(0xFF9F1239),
+          surface: const Color(0xFFF6F7FB),
+          onSurface: const Color(0xFF111827),
+          onSurfaceVariant: const Color(0xFF4B5563),
+          surfaceContainerLowest: Colors.white,
+          surfaceContainerLow: const Color(0xFFF1F2F8),
+          surfaceContainer: const Color(0xFFECEEF6),
+          surfaceContainerHigh: const Color(0xFFE5E7F2),
+          surfaceContainerHighest: const Color(0xFFDDE0EE),
+          outline: const Color(0xFF9CA3AF),
+          outlineVariant: const Color(0xFFE0E3EE),
+        )
+      : ColorScheme.fromSeed(seedColor: indigo, brightness: Brightness.dark).copyWith(
+          primary: const Color(0xFFA5B4FC),
+          onPrimary: const Color(0xFF1E1B4B),
+          primaryContainer: const Color(0xFF312E81),
+          onPrimaryContainer: const Color(0xFFE0E7FF),
+          secondary: const Color(0xFF34D399),
+          onSecondary: const Color(0xFF052E1C),
+          secondaryContainer: const Color(0xFF064E3B),
+          onSecondaryContainer: const Color(0xFFD1FAE5),
+          tertiary: const Color(0xFFC4B5FD),
+          onTertiary: const Color(0xFF2E1065),
+          error: const Color(0xFFFB7185),
+          onError: const Color(0xFF4C0519),
+          errorContainer: const Color(0xFF3B1622),
+          onErrorContainer: const Color(0xFFFECDD3),
+          surface: const Color(0xFF11121A),
+          onSurface: const Color(0xFFE5E7EB),
+          onSurfaceVariant: const Color(0xFFA1A7B8),
+          surfaceContainerLowest: const Color(0xFF0C0D13),
+          surfaceContainerLow: const Color(0xFF161722),
+          surfaceContainer: const Color(0xFF1B1C28),
+          surfaceContainerHigh: const Color(0xFF232435),
+          surfaceContainerHighest: const Color(0xFF2C2E42),
+          outline: const Color(0xFF6B7085),
+          outlineVariant: const Color(0xFF34364A),
+        );
   return ThemeData(
-    colorSchemeSeed: _classicSeed,
-    brightness: b,
+    colorScheme: scheme,
     useMaterial3: true,
+    cardTheme: CardThemeData(
+      elevation: 0,
+      color: light ? Colors.white : scheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: scheme.outlineVariant),
+      ),
+    ),
     extensions: [
       light
           ? const FinPalette(
-              income: Color(0xFF1B8A5A),
-              expense: Color(0xFFC0392B),
-              pending: Color(0xFFB9770E),
-              paid: Color(0xFF2E6DA4),
-              neutral: Color(0xFF5D6D7E),
-              chartBase: Color(0xFF2E6DA4),
-              chartScenario: Color(0xFFB9770E))
+              income: Color(0xFF047857),
+              expense: Color(0xFFE11D48),
+              pending: Color(0xFFB45309),
+              paid: Color(0xFF4338CA),
+              neutral: Color(0xFF6B7280),
+              chartBase: Color(0xFF4338CA),
+              chartScenario: Color(0xFFB45309))
           : const FinPalette(
-              income: Color(0xFF4CC38A),
-              expense: Color(0xFFFF6B5E),
-              pending: Color(0xFFF5B041),
-              paid: Color(0xFF6FA8DC),
-              neutral: Color(0xFFA0AAB4),
-              chartBase: Color(0xFF4A90E2),
-              chartScenario: Color(0xFFD4822A)),
+              income: Color(0xFF34D399),
+              expense: Color(0xFFFB7185),
+              pending: Color(0xFFFBBF24),
+              paid: Color(0xFFA5B4FC),
+              neutral: Color(0xFF9CA3AF),
+              chartBase: Color(0xFF818CF8),
+              chartScenario: Color(0xFFFBBF24)),
     ],
   );
 }
