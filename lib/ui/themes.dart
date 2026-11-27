@@ -69,7 +69,7 @@ extension AppThemeInfo on AppTheme {
         AppTheme.classicDark => 'Índigo y azul cielo en modo oscuro',
         AppTheme.drago => 'Dorado y café del emblema de Drago',
         AppTheme.dragoDark => 'El emblema de Drago en modo oscuro',
-        AppTheme.ryusui => 'Dorado, rojo vino y azul',
+        AppTheme.ryusui => 'Naranja, azul cobalto y rojo capitán',
         AppTheme.nami => 'Naranja, durazno y azul cielo',
       };
 
@@ -80,8 +80,8 @@ extension AppThemeInfo on AppTheme {
         AppTheme.drago => const [Color(0xFFFCC858), Color(0xFF5B3A1A), Color(0xFF270D07), Color(0xFFFCE7B0), Color(0xFFFBF7EE)],
         AppTheme.dragoDark => const [Color(0xFFFCC858), Color(0xFFE8B750), Color(0xFF5B3A1A), Color(0xFF270D07), Color(0xFF1A0B06)],
         AppTheme.ryusui => const [
-            Color(0xFFE8B84C), Color(0xFFF5D77A), Color(0xFFC9272C), Color(0xFF751A24),
-            Color(0xFFD9C29B), Color(0xFF2455A4), Color(0xFFE77A27), Color(0xFF65402D),
+            Color(0xFFE87524), Color(0xFF2455A4), Color(0xFFB92732), Color(0xFFF2C94C),
+            Color(0xFF8B552E), Color(0xFFF0D6B5), Color(0xFF252525),
           ],
         AppTheme.nami => const [
             Color(0xFFF28C28), Color(0xFFFFAD45), Color(0xFFF5C49F), Color(0xFF75432E),
@@ -286,46 +286,67 @@ ThemeData _drago(Brightness b) {
   );
 }
 
-/// Ryusui: rojo vino como color principal, dorado en tarjetas y navegación,
-/// fondo pergamino y azul para los ingresos.
+/// Ryusui: naranja Ryusui en botones y acentos, azul cobalto en la tarjeta
+/// principal y los ingresos, rojo capitán para alertas y pagos vencidos,
+/// barra superior negro carbón y fondo neutro (distinto del crema de Drago).
 ThemeData _ryusui() {
-  final scheme = ColorScheme.fromSeed(seedColor: const Color(0xFF751A24)).copyWith(
-    primary: const Color(0xFF751A24),
+  const orange = Color(0xFFE87524);
+  const cobalt = Color(0xFF2455A4);
+  const captain = Color(0xFFB92732);
+  const charcoal = Color(0xFF252525);
+  const brown = Color(0xFF8B552E);
+  final scheme = ColorScheme.fromSeed(seedColor: orange).copyWith(
+    // El naranja puro es claro para texto: «primary» (texto, iconos, bordes)
+    // usa uno más profundo; los botones rellenos llevan el naranja original.
+    primary: const Color(0xFFB9551A),
     onPrimary: Colors.white,
-    primaryContainer: const Color(0xFFF5D77A),
-    onPrimaryContainer: const Color(0xFF65402D),
-    secondary: const Color(0xFF2455A4),
+    primaryContainer: const Color(0xFFDCE6F7),
+    onPrimaryContainer: const Color(0xFF12305F),
+    secondary: cobalt,
     onSecondary: Colors.white,
-    secondaryContainer: const Color(0xFFF5D77A),
-    onSecondaryContainer: const Color(0xFF65402D),
-    tertiary: const Color(0xFFE77A27),
+    secondaryContainer: const Color(0xFFFCDCC4),
+    onSecondaryContainer: const Color(0xFF5A2A0C),
+    tertiary: captain,
     onTertiary: Colors.white,
-    error: const Color(0xFFC9272C),
-    errorContainer: const Color(0xFFF6D5D3),
-    onErrorContainer: const Color(0xFF751A24),
-    surface: const Color(0xFFFBF6EC),
-    onSurface: const Color(0xFF3A2A20),
-    onSurfaceVariant: const Color(0xFF65402D),
-    surfaceContainerLowest: const Color(0xFFFFFDF8),
-    surfaceContainerLow: const Color(0xFFF6EDDC),
-    surfaceContainer: const Color(0xFFF1E5CE),
-    surfaceContainerHigh: const Color(0xFFEBDDC1),
-    surfaceContainerHighest: const Color(0xFFE3D2B2),
-    outline: const Color(0xFF9C8466),
-    outlineVariant: const Color(0xFFD9C29B),
+    tertiaryContainer: const Color(0xFFF2C94C),
+    onTertiaryContainer: charcoal,
+    error: captain,
+    errorContainer: const Color(0xFFF8D9DB),
+    onErrorContainer: const Color(0xFF7A1820),
+    surface: const Color(0xFFF7F5F2),
+    onSurface: charcoal,
+    onSurfaceVariant: const Color(0xFF5E5148),
+    surfaceContainerLowest: Colors.white,
+    surfaceContainerLow: const Color(0xFFF1EEEA),
+    surfaceContainer: const Color(0xFFECE7E1),
+    surfaceContainerHigh: const Color(0xFFE5DFD7),
+    surfaceContainerHighest: const Color(0xFFDDD5CB),
+    outline: const Color(0xFF9A8F86),
+    outlineVariant: const Color(0xFFF0D6B5),
   );
   return ThemeData(
     colorScheme: scheme,
     useMaterial3: true,
+    appBarTheme: const AppBarTheme(backgroundColor: charcoal, foregroundColor: Colors.white),
+    cardTheme: CardThemeData(
+      elevation: 0,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: scheme.outlineVariant),
+      ),
+    ),
+    filledButtonTheme: FilledButtonThemeData(style: FilledButton.styleFrom(backgroundColor: orange, foregroundColor: charcoal)),
+    floatingActionButtonTheme: const FloatingActionButtonThemeData(backgroundColor: orange, foregroundColor: charcoal),
     extensions: const [
       FinPalette(
-        income: Color(0xFF2455A4),
-        expense: Color(0xFFC9272C),
-        pending: Color(0xFFBF5F14), // naranja #E77A27 oscurecido para leerse sobre fondo claro
-        paid: Color(0xFF65402D),
-        neutral: Color(0xFF8C7A63),
-        chartBase: Color(0xFF2455A4),
-        chartScenario: Color(0xFFBF5F14),
+        income: cobalt,
+        expense: captain,
+        pending: Color(0xFF9A7400), // rubio dorado #F2C94C oscurecido para leerse sobre fondo claro
+        paid: brown,
+        neutral: Color(0xFF7D7268),
+        chartBase: cobalt,
+        chartScenario: Color(0xFFC85F12),
       ),
     ],
   );
